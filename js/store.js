@@ -1,5 +1,5 @@
 // Images, settings, rotation and Bing photo search for Backdrop Rotator.
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.1.0';
 
 const BR = (() => {
   // ---------- Storage (lives in the extension, reached through the bridge) ----------
@@ -42,8 +42,13 @@ const BR = (() => {
     aiStyle: 'cinematic',
     aiFont: 'Bebas Neue',
     aiTextPos: 'center',
-    aiTextMode: 'ai'       // 'ai' (model draws it, OpenAI only) | 'overlay'
+    aiTextMode: 'ai',      // 'ai' (model draws it, OpenAI only) | 'overlay'
+    // Eco mode
+    eco: false,
+    aiDay: { d: '', n: 0 }  // AI images made today (for the Eco daily limit)
   };
+
+  const ECO = { aiPerDay: 5, maxPerSearch: 50, freeSize: [768, 432], openaiQuality: 'low' };
 
   const getSettings = () => Bridge.call('storage.get', DEFAULTS);
   const saveSettings = (patch) => Bridge.call('storage.set', patch);
@@ -103,10 +108,13 @@ const BR = (() => {
     ''
   ];
 
-  async function bingPage(q, start, filter) {
+  async function bingPage(q, start, filter, purpose) {
     const url = 'https://www.bing.com/images/async?q=' + encodeURIComponent(q) +
       `&first=${start}&count=35&adlt=moderate&mmasync=1` + (filter ? '&qft=' + filter : '');
-    const r = await webFetch(url, { timeout: 20000 }).catch(() => { throw new Error("Couldn't reach Bing. Check your internet connection."); });
+    const r = await webFetch(url, { timeout: 20000, purpose }).catch((e) => {
+      if (/^Blocked:|stopped/.test(e.message)) throw e;
+      throw new Error("Couldn't reach Bing. Check your internet connection.");
+    });
     if (!r.ok) throw new Error(`Image search failed (error ${r.status}). Try again in a minute.`);
     const out = [];
     for (const m of r.body.matchAll(/\bm="(\{[^"]*?\})"/g)) {
@@ -120,17 +128,17 @@ const BR = (() => {
     return out;
   }
 
-  async function searchImages(q, start = 0, level = null) {
-    if (level != null) return { results: await bingPage(q, start, FILTERS[level]), level };
+  async function searchImages(q, start = 0, level = null, purpose) {
+    if (level != null) return { results: await bingPage(q, start, FILTERS[level], purpose), level };
     for (let i = 0; i < FILTERS.length; i++) {
-      const results = await bingPage(q, start, FILTERS[i]);
+      const results = await bingPage(q, start, FILTERS[i], purpose);
       if (results.length >= 12 || i === FILTERS.length - 1) return { results, level: i };
     }
   }
 
-  async function download(c, { minWidth = 600, landscape = false } = {}) {
+  async function download(c, { minWidth = 600, landscape = false, purpose } = {}) {
     try {
-      const r = await webFetch(c.full, { responseType: 'blob', timeout: 25000 });
+      const r = await webFetch(c.full, { responseType: 'blob', timeout: 25000, purpose });
       const blob = r.body;
       if (!r.ok || !blob || !blob.type.startsWith('image/') || blob.size < 20000 || blob.size > 30e6) return null;
       const bmp = await createImageBitmap(blob);
@@ -142,7 +150,10 @@ const BR = (() => {
         source: 'web', srcKey: c.key,
         credit: { title: c.title, site: host(c.page) || host(c.full), link: c.page }
       };
-    } catch (e) { return null; }
+    } catch (e) {
+      if (/^Blocked:|stopped/.test(e.message)) throw e; // access turned off: stop the whole run
+      return null;
+    }
   }
 
   // Run fn over items with n at a time.
@@ -154,14 +165,16 @@ const BR = (() => {
   }
 
   async function addPicked(cands, onProgress) {
+    let blockErr = null;
     const recs = [];
     let failed = 0, done = 0;
     await pool(cands, 4, async (c) => {
-      const rec = await download(c);
+      const rec = await download(c).catch((e) => { blockErr = e; return null; });
       if (rec) { rec.keep = true; recs.push(rec); } else failed++;
       if (onProgress) onProgress(++done, cands.length);
     });
     await addRecords(recs);
+    if (blockErr && !recs.length) throw blockErr;
     return { added: recs.length, failed };
   }
 
@@ -174,11 +187,12 @@ const BR = (() => {
   }
 
   // Fill an auto-rotating search with up to perTheme photos (paging through Bing as far as it goes).
-  async function fetchTheme(name, { replace = false, onProgress } = {}) {
+  async function fetchTheme(name, { replace = false, onProgress, auto = false } = {}) {
     name = name.trim();
     const key = themeKey(name);
     const s = await getSettings();
-    const want = s.perTheme;
+    const purpose = auto ? 'auto' : 'user';
+    const want = s.eco ? Math.min(s.perTheme, ECO.maxPerSearch) : s.perTheme;
     let seen = new Set(s.seen[key] || []);
     let oldIds = [];
     if (replace) {
@@ -190,7 +204,7 @@ const BR = (() => {
     const tried = new Set(), newKeys = [];
     const maxPages = Math.ceil(want / 20) + 8;
     for (let page = 0; page < maxPages && got < want; page++) {
-      const res = await searchImages(name, page * 35, level);
+      const res = await searchImages(name, page * 35, level, purpose);
       level = res.level;
       if (!res.results.length) break;
       let fresh = res.results.filter((c) => !seen.has(c.key) && !tried.has(c.key));
@@ -201,7 +215,7 @@ const BR = (() => {
       const batch = [];
       await pool(fresh, 6, async (c) => {
         if (got + batch.length >= want) return;
-        const rec = await download(c, { minWidth: 1280, landscape: true });
+        const rec = await download(c, { minWidth: 1280, landscape: true, purpose });
         if (rec && got + batch.length < want) { rec.theme = key; batch.push(rec); }
       });
       await addRecords(batch); // save as we go, so a closed tab keeps what it got
@@ -233,22 +247,31 @@ const BR = (() => {
 
   // Called from new tabs: refresh any auto-rotating search that's due (one tab at a time).
   const PERIOD = { daily: 24 * 3600e3, weekly: 7 * 24 * 3600e3 };
+  async function onBattery() {
+    try { const b = navigator.getBattery && await navigator.getBattery(); return !!(b && !b.charging); } catch (e) { return false; }
+  }
+
   async function refreshDueThemes() {
     const s = await getSettings();
-    const period = PERIOD[s.autoRefresh];
+    const info = await Bridge.call('info').catch(() => ({ perms: {} }));
+    if (info.perms && info.perms.autoRefresh === false) return; // turned off in the Control Center
+    // Eco: at most weekly, and only while plugged in.
+    const period = s.eco && s.autoRefresh !== 'off' ? PERIOD.weekly : PERIOD[s.autoRefresh];
     if (!period || !s.themes.length) return;
+    if (s.eco && await onBattery()) return;
     const due = s.themes.filter((t) => Date.now() - (t.lastFetched || 0) >= period);
     if (!due.length || Date.now() - s.refreshLock < 10 * 60000) return;
     await saveSettings({ refreshLock: Date.now() });
     for (const t of due) {
-      try { await fetchTheme(t.name, { replace: true }); } catch (e) { console.warn('Refresh failed for', t.name, e); }
+      try { await fetchTheme(t.name, { replace: true, auto: true }); }
+      catch (e) { console.warn('Refresh failed for', t.name, e); if (/^Blocked:|stopped/.test(e.message)) break; }
     }
     await saveSettings({ refreshLock: 0 });
   }
 
   return {
     addImages, addRecords, putImage, getIds, getImage, getAll, deleteImage, deleteMany, clearAll,
-    DEFAULTS, getSettings, saveSettings, isDue, msUntilNext, advance, webFetch,
+    DEFAULTS, ECO, getSettings, saveSettings, isDue, msUntilNext, advance, webFetch,
     themeKey, searchImages, addPicked, addFromUrl, fetchTheme, removeTheme, refreshDueThemes
   };
 })();

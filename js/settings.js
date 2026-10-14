@@ -49,7 +49,39 @@ else (() => {
     for (const k of ['clock', 'clock24', 'search', 'showCredit']) $('#' + k).checked = s[k];
     $('#dimOut').textContent = s.dim + '%';
     $('#intervalRow').hidden = s.mode !== 'interval';
+    $('#ecoSw').checked = s.eco;
+    updateEco(s.eco);
     updateAiUI();
+  }
+
+  async function updateEco(on) {
+    $('#ecoBadge').hidden = !on;
+    const n = await AI.usedToday();
+    $('#aiCount').textContent = on ? `(${n} of ${BR.ECO.aiPerDay} used today)` : '';
+    const q = $('#openaiQuality');
+    q.disabled = on;
+    q.title = on ? 'Eco mode uses Low quality' : '';
+    const opts = [...$('#perTheme').options];
+    opts.forEach((o) => { o.disabled = on && +o.value > BR.ECO.maxPerSearch; });
+  }
+
+  async function showSafetyInfo() {
+    const info = await Bridge.call('info').catch(() => null);
+    if (!info) return;
+    const b = $('#updBanner');
+    if (info.update) {
+      b.replaceChildren();
+      const t = document.createElement('span');
+      t.textContent = `Version ${info.update.version} of the app is ready. Review what changed and approve it in the Control Center.`;
+      const btn = document.createElement('button');
+      btn.className = 'btn sm';
+      btn.textContent = 'Review update';
+      btn.addEventListener('click', () => Bridge.call('openControl'));
+      b.append(t, btn);
+      b.hidden = false;
+    } else b.hidden = true;
+    const off = Object.entries(info.perms || {}).filter(([, v]) => !v).length;
+    $('#openControl').textContent = off ? `Control Center (${off} access setting${off > 1 ? 's' : ''} off)` : 'Control Center: access & updates';
   }
 
   // ---------- Auto-rotating searches + library ----------
@@ -269,9 +301,10 @@ else (() => {
     $('#textModeWrap').hidden = free;
     $('#fontWrap').hidden = !overlay;
     $('#posWrap').hidden = !overlay;
-    $('#engineNote').textContent = free
+    const eco = $('#ecoSw').checked;
+    $('#engineNote').textContent = (eco ? '🌱 Eco mode: lighter, lower-resolution generation, 5 images a day. ' : '') + (free
       ? 'Free generator: lower resolution (upscaled to fit your screen) with a small pollinations.ai mark. It can’t spell reliably, so your text is added as clean lettering on top.'
-      : 'OpenAI: sharp, ChatGPT-quality images that can draw your words into the scene. Uses your own OpenAI key, which is billed per image.';
+      : 'OpenAI: sharp, ChatGPT-quality images that can draw your words into the scene. Uses your own OpenAI key, which is billed per image.');
     if (!free && !$('#openaiKey').value) $('#openaiBox').open = true;
   }
 
@@ -301,6 +334,7 @@ else (() => {
       $('#aiPreview').hidden = false;
       $('#aiSave').disabled = $('#aiShow').disabled = false;
       status('', false, '#aiStatus');
+      updateEco($('#ecoSw').checked);
     } catch (e) {
       status(e.message, true, '#aiStatus');
     } finally {
@@ -326,6 +360,21 @@ else (() => {
   $('#aiAgain').addEventListener('click', generate);
   $('#aiSave').addEventListener('click', () => saveGen(false));
   $('#aiShow').addEventListener('click', () => saveGen(true));
+
+  // ---------- Safety + Eco ----------
+
+  $('#appStop').addEventListener('click', () => Bridge.call('stop'));
+  $('#openControl').addEventListener('click', () => Bridge.call('openControl'));
+  $('#ecoSw').addEventListener('change', async (e) => {
+    const on = e.target.checked;
+    const patch = { eco: on };
+    const s = await BR.getSettings();
+    if (on && s.perTheme > BR.ECO.maxPerSearch) { patch.perTheme = BR.ECO.maxPerSearch; $('#perTheme').value = String(BR.ECO.maxPerSearch); }
+    await BR.saveSettings(patch);
+    updateEco(on);
+    updateAiUI();
+    toast(on ? 'Eco mode on' : 'Eco mode off');
+  });
 
   // ---------- Settings ----------
 
@@ -380,5 +429,5 @@ else (() => {
 
   Bridge.onStorage((c) => { if ('currentId' in c || 'themes' in c) render(); });
 
-  Promise.all([loadSettings(), render()]).finally(() => Bridge.ready());
+  Promise.all([loadSettings(), render(), showSafetyInfo()]).finally(() => Bridge.ready());
 })();

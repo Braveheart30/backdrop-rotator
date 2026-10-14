@@ -36,13 +36,13 @@ const AI = (() => {
   }
 
   let lastFree = 0;
-  async function free(prompt) {
+  async function free(prompt, eco) {
     const wait = 16000 - (Date.now() - lastFree);
     if (wait > 0) throw new Error(`The free generator allows one image every 15 seconds. Try again in ${Math.ceil(wait / 1000)}s.`);
     lastFree = Date.now();
     const seed = Math.floor(Math.random() * 1e9);
     const url = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(prompt) +
-      `?width=1024&height=576&seed=${seed}&referrer=backdroprotator`;
+      `?width=${eco ? BR.ECO.freeSize[0] : 1024}&height=${eco ? BR.ECO.freeSize[1] : 576}&seed=${seed}&referrer=backdroprotator`;
     const r = await BR.webFetch(url, { responseType: 'blob', timeout: 150000 });
     if (r.status === 429) throw new Error('The free generator is busy. Wait a minute and try again.');
     if (!r.ok || !r.body || !r.body.type.startsWith('image/'))
@@ -55,7 +55,7 @@ const AI = (() => {
     const call = (size) => BR.webFetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + s.openaiKey },
-      body: JSON.stringify({ model: s.openaiModel || 'gpt-image-2', prompt, size, quality: s.openaiQuality, n: 1 }),
+      body: JSON.stringify({ model: s.openaiModel || 'gpt-image-2', prompt, size, quality: s.eco ? BR.ECO.openaiQuality : s.openaiQuality, n: 1 }),
       responseType: 'json',
       timeout: 240000
     });
@@ -118,12 +118,22 @@ const AI = (() => {
   async function generate({ prompt, text, style, engine, textMode, font, pos }) {
     if (!prompt.trim()) throw new Error('Describe the background you want first.');
     const s = await BR.getSettings();
+    const today = new Date().toDateString();
+    const made = s.aiDay && s.aiDay.d === today ? s.aiDay.n : 0;
+    if (s.eco && made >= BR.ECO.aiPerDay)
+      throw new Error(`Eco mode limit reached: ${BR.ECO.aiPerDay} AI images per day. Turn off Eco mode to make more today.`);
     text = (text || '').trim();
     const aiDrawsText = !!text && engine === 'openai' && textMode === 'ai';
     const full = buildPrompt(prompt, style, aiDrawsText ? text : '', text && !aiDrawsText ? pos : '');
-    const raw = engine === 'openai' ? await openai(full, s) : await free(full);
+    const raw = engine === 'openai' ? await openai(full, s) : await free(full, s.eco);
+    await BR.saveSettings({ aiDay: { d: today, n: made + 1 } });
     return finalize(raw, { text: aiDrawsText ? '' : text, font, pos, upscale: engine !== 'openai' });
   }
 
-  return { STYLES, FONTS, generate };
+  async function usedToday() {
+    const s = await BR.getSettings();
+    return s.aiDay && s.aiDay.d === new Date().toDateString() ? s.aiDay.n : 0;
+  }
+
+  return { STYLES, FONTS, generate, usedToday };
 })();

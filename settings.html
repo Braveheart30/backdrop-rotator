@@ -10,11 +10,17 @@
   <link rel="stylesheet" href="css/settings.css">
 </head>
 <body>
+  <div class="safety-bar">
+    <button id="appStop" class="stop-mini" title="Stops the app, AI and all downloads instantly (shortcut Alt+Shift+X)">■ Stop everything</button>
+    <button id="openControl" class="btn ghost sm">Control Center: access &amp; updates</button>
+    <span id="ecoBadge" class="eco-badge" hidden>🌱 Eco mode on</span>
+  </div>
+  <div id="updBanner" class="upd-banner" hidden></div>
   <header>
     <h1>Backdrop Rotator</h1>
     <p>Photos from anywhere on the web, AI creations, or your own pictures, rotated onto every Edge new tab.</p>
     <nav class="jump">
-      <a href="#find">Find photos</a><a href="#create">Create with AI</a><a href="#auto">Auto-rotate</a><a href="#page">New tab</a><a href="#library">Library</a>
+      <a href="#find">Find photos</a><a href="#create">Create with AI</a><a href="#auto">Auto-rotate</a><a href="#eco">Eco mode</a><a href="#page">New tab</a><a href="#library">Library</a>
     </nav>
   </header>
 
@@ -153,6 +159,22 @@
         <option value="off">Never</option>
       </select>
     </div>
+  </section>
+
+  <section class="card" id="eco">
+    <div class="row first">
+      <div>
+        <h2>🌱 Eco mode</h2>
+        <p class="hint" style="margin:0">Uses less energy, mostly by making AI work lighter. AI image generation is by far the most energy-hungry thing this app does.</p>
+      </div>
+      <input id="ecoSw" type="checkbox" class="switch" aria-label="Eco mode">
+    </div>
+    <ul class="eco-list">
+      <li><strong>Lighter AI images:</strong> the free generator makes smaller images (about 40% fewer pixels to compute), and OpenAI uses its low-quality setting, which needs far less computing than high.</li>
+      <li><strong>Fewer AI images:</strong> at most 5 per day. <span id="aiCount"></span></li>
+      <li><strong>Fewer downloads:</strong> auto-rotating searches refresh at most weekly, hold up to 50 photos each, and only refresh while your laptop is plugged in.</li>
+    </ul>
+    <p class="note">The trade-off: AI images look softer, and you get fewer fresh photos.</p>
   </section>
 
   <section class="card" id="page">

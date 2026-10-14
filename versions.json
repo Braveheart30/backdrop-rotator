@@ -1,0 +1,15 @@
+{
+  "latest": "2.1.0",
+  "versions": [
+    {
+      "version": "2.1.0",
+      "date": "2026-10-14",
+      "notes": [
+        "Emergency stop: toolbar button, Alt+Shift+X shortcut, and a Stop button in settings",
+        "Control Center: choose what the app can access, see an activity log, approve code updates",
+        "Eco mode: lighter AI images, 5 AI images a day, fewer background downloads",
+        "Up to 1,000 photos per auto-rotating search"
+      ]
+    }
+  ]
+}
