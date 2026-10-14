@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Backdrop Rotator Settings</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Black+Ops+One&family=Cinzel:wght@700&family=Orbitron:wght@800&family=Permanent+Marker&family=Playfair+Display:wght@700&display=swap">
+  <link rel="stylesheet" href="css/settings.css">
+</head>
+<body>
+  <header>
+    <h1>Backdrop Rotator</h1>
+    <p>Photos from anywhere on the web, AI creations, or your own pictures, rotated onto every Edge new tab.</p>
+    <nav class="jump">
+      <a href="#find">Find photos</a><a href="#create">Create with AI</a><a href="#auto">Auto-rotate</a><a href="#page">New tab</a><a href="#library">Library</a>
+    </nav>
+  </header>
+
+  <section class="card" id="find">
+    <h2>Find photos</h2>
+    <p class="hint">Search anything, just like Bing Images. Click the photos you want, then add them.</p>
+    <form id="searchForm" class="theme-form">
+      <input id="searchInput" type="search" placeholder="e.g. F-22 Raptor, Lord of the Rings landscapes, Tokyo at night" autocomplete="off" required>
+      <button id="searchBtn" class="btn" type="submit">Search</button>
+    </form>
+    <div id="searchStatus" class="status" role="status"></div>
+    <div id="resultsBar" class="results-bar" hidden>
+      <span id="pickCount">Click photos to select them</span>
+      <div class="actions">
+        <button id="selectAll" class="btn ghost">Select all</button>
+        <button id="addPicked" class="btn" disabled>Add selected</button>
+        <button id="saveTheme" class="btn ghost" title="Fills your rotation from this search and swaps in new photos automatically">Auto-rotate this search</button>
+      </div>
+    </div>
+    <div id="results"></div>
+    <div class="more-wrap"><button id="moreBtn" class="btn ghost" hidden>Show more results</button></div>
+    <details class="url-add">
+      <summary>Have a specific image? Paste its link</summary>
+      <form id="urlForm" class="theme-form">
+        <input id="urlInput" type="url" placeholder="https://… (right-click an image > Copy image link)" required>
+        <button class="btn ghost" type="submit">Add</button>
+      </form>
+    </details>
+  </section>
+
+  <section class="card" id="create">
+    <h2>Create with AI</h2>
+    <p class="hint">Describe a background and add any words you want built into it.</p>
+    <label class="field" for="aiPrompt">Describe the background</label>
+    <textarea id="aiPrompt" rows="3" placeholder="e.g. A stealth fighter jet flying low over snowy mountains at dawn, with clouds glowing orange"></textarea>
+    <label class="field" for="aiText">Text to include <span class="opt">(optional · press Enter for a new line)</span></label>
+    <textarea id="aiText" rows="2" placeholder="e.g. STAY LOCKED IN"></textarea>
+    <div class="ai-grid">
+      <label>Style
+        <select id="aiStyle">
+          <option value="cinematic">Cinematic photo</option>
+          <option value="digital">Digital painting</option>
+          <option value="scifi">Sci-fi</option>
+          <option value="anime">Anime</option>
+          <option value="poster">Bold poster</option>
+          <option value="oil">Oil painting</option>
+          <option value="minimal">Minimalist</option>
+          <option value="none">No style (exactly as described)</option>
+        </select>
+      </label>
+      <label>Generator
+        <select id="aiEngine">
+          <option value="free">Free (no account, basic quality)</option>
+          <option value="openai">OpenAI GPT Image (ChatGPT quality)</option>
+        </select>
+      </label>
+      <label id="textModeWrap">How to add the text
+        <select id="aiTextMode">
+          <option value="ai">AI draws it into the scene</option>
+          <option value="overlay">Clean lettering on top</option>
+        </select>
+      </label>
+      <label id="fontWrap">Lettering font
+        <select id="aiFont">
+          <option>Bebas Neue</option>
+          <option>Black Ops One</option>
+          <option>Cinzel</option>
+          <option>Orbitron</option>
+          <option>Playfair Display</option>
+          <option>Permanent Marker</option>
+        </select>
+      </label>
+      <label id="posWrap">Text position
+        <select id="aiTextPos">
+          <option value="top">Top</option>
+          <option value="center">Center</option>
+          <option value="bottom">Bottom</option>
+        </select>
+      </label>
+    </div>
+    <p id="engineNote" class="note"></p>
+    <details id="openaiBox" class="url-add">
+      <summary>OpenAI settings</summary>
+      <div class="ai-grid">
+        <label class="wide">API key
+          <input id="openaiKey" type="password" placeholder="sk-…" autocomplete="off">
+        </label>
+        <label>Model
+          <input id="openaiModel" type="text" placeholder="gpt-image-2">
+        </label>
+        <label>Quality
+          <select id="openaiQuality">
+            <option value="high">High (best, costs most)</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low (cheapest)</option>
+          </select>
+        </label>
+      </div>
+      <p class="note">Get a key at platform.openai.com → API keys. OpenAI charges your account per image. The key stays in your browser and is only sent to OpenAI.</p>
+    </details>
+    <div class="ai-actions">
+      <button id="genBtn" class="btn">Generate</button>
+      <span id="aiStatus" class="status" role="status"></span>
+    </div>
+    <div id="aiPreview" hidden>
+      <img id="aiImg" alt="Generated background">
+      <div class="ai-actions">
+        <button id="aiSave" class="btn">Save as background</button>
+        <button id="aiShow" class="btn ghost">Save &amp; show now</button>
+        <button id="aiAgain" class="btn ghost">Try again</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="auto">
+    <h2>Auto-rotating searches</h2>
+    <p class="hint">These searches fill your rotation and swap in fresh photos on a schedule. Photos you pick by hand stay until you delete them.</p>
+    <div id="themeStatus" class="status" role="status"></div>
+    <div id="themeList"></div>
+    <div class="row">
+      <label for="perTheme">Photos per search</label>
+      <select id="perTheme">
+        <option value="25">25</option>
+        <option value="50">50</option>
+        <option value="100">100</option>
+        <option value="250">250</option>
+        <option value="500">500</option>
+        <option value="1000">As many as Bing has (up to 1,000)</option>
+      </select>
+    </div>
+    <div class="row">
+      <label for="autoRefresh">Swap in a fresh set</label>
+      <select id="autoRefresh">
+        <option value="daily">Every day</option>
+        <option value="weekly">Every week</option>
+        <option value="off">Never</option>
+      </select>
+    </div>
+  </section>
+
+  <section class="card" id="page">
+    <h2>New tab page</h2>
+    <div class="row">
+      <label for="mode">Change background</label>
+      <select id="mode">
+        <option value="newtab">Every new tab</option>
+        <option value="interval">On a timer</option>
+        <option value="daily">Once a day</option>
+      </select>
+    </div>
+    <div class="row" id="intervalRow">
+      <label for="intervalMin">Every</label>
+      <span class="inline"><input id="intervalMin" type="number" min="1" max="1440"> minutes</span>
+    </div>
+    <div class="row">
+      <label for="order">Order</label>
+      <select id="order">
+        <option value="shuffle">Shuffle (no repeats until all shown)</option>
+        <option value="sequence">In order added</option>
+      </select>
+    </div>
+    <div class="row"><label for="clock">Show clock</label><input id="clock" type="checkbox" class="switch"></div>
+    <div class="row"><label for="clock24">24-hour clock</label><input id="clock24" type="checkbox" class="switch"></div>
+    <div class="row"><label for="search">Show search box</label><input id="search" type="checkbox" class="switch"></div>
+    <div class="row"><label for="showCredit">Show photo source</label><input id="showCredit" type="checkbox" class="switch"></div>
+    <div class="row">
+      <label for="dim">Darken image</label>
+      <span class="inline"><input id="dim" type="range" min="0" max="70" step="5"><output id="dimOut"></output></span>
+    </div>
+  </section>
+
+  <section class="card" id="library">
+    <div class="lib-head">
+      <h2>Library <span id="count"></span></h2>
+      <div class="actions">
+        <label class="btn">Add images<input id="files" type="file" accept="image/*" multiple hidden></label>
+        <label class="btn ghost">Add folder<input id="folder" type="file" webkitdirectory multiple hidden></label>
+        <button id="clear" class="btn danger">Clear all</button>
+      </div>
+    </div>
+    <div id="drop">Drop your own images here. Click any thumbnail to show it now. Photos marked ♥ stay when a search refreshes.</div>
+    <div id="grid"></div>
+    <div class="more-wrap"><button id="libMore" class="btn ghost" hidden>Show more</button></div>
+  </section>
+
+  <footer id="footer"></footer>
+  <div id="toast" role="status"></div>
+
+  <script src="js/bridge.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/settings.js"></script>
+</body>
+</html>
