@@ -1,6 +1,13 @@
 {
-  "latest": "2.4.1",
+  "latest": "2.4.2",
   "versions": [
+    {
+      "version": "2.4.2",
+      "date": "2026-10-14",
+      "notes": [
+        "Clearer message when Claude sketches need a newer extension: shows the extension version Edge is running and how to update it"
+      ]
+    },
     {
       "version": "2.4.1",
       "date": "2026-10-14",

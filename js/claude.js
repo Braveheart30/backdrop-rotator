@@ -60,7 +60,7 @@ Reply with ONLY a JSON object, no prose, no code fences:
     if (!subject) throw new Error('Type something for Claude to sketch first.');
     const info = await Bridge.call('info').catch(() => ({}));
     if (!shellOk(info.shellVersion)) {
-      throw new Error('Claude sketches need the latest Backdrop Rotator extension (it adds a Claude switch to your Control Center). Install the new zip once, then try again.');
+      throw new Error(`Claude sketches need Backdrop Rotator extension ${MIN_SHELL.join('.')} or newer, and Edge is running extension ${info.shellVersion || 'unknown'}. (The app itself is ${APP_VERSION}; the extension is the part installed in Edge.) Extract the new zip into the folder shown under "Loaded from" in edge://extensions, then click Reload.`);
     }
     const s = await BR.getSettings();
     if (!s.claudeKey) throw new Error('Add your Anthropic API key under "Claude settings" first.');
