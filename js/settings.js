@@ -50,6 +50,9 @@ else (() => {
     $('#dimOut').textContent = s.dim + '%';
     $('#intervalRow').hidden = s.mode !== 'interval';
     $('#ecoSw').checked = s.eco;
+    $('#skStyle').value = s.sketchStyle || 'neon';
+    $('#skText').value = s.sketchText || '';
+    renderSketchGrid();
     $('#filterFaces').checked = s.filterFaces;
     $('#filterShops').checked = s.filterShops;
     $('#blockedSites').value = (s.blockedSites || []).join('\n');
@@ -133,11 +136,18 @@ else (() => {
       const fig = el('figure');
       if (rec.id === s.currentId) fig.classList.add('current');
       fig.title = `${rec.name} (click to show now)`;
-      const img = el('img');
-      img.src = url; img.loading = 'lazy'; img.decoding = 'async'; img.alt = rec.name;
-      img.addEventListener('error', () => fig.classList.add('broken'));
-      fig.append(img);
-      const tag = rec.source === 'ai' ? 'AI' : rec.theme ? (themeNames[rec.theme] || rec.theme) : '';
+      if (rec.source === 'sketch' && rec.sketch) {
+        const box = el('div', 'sk-thumb');
+        box.style.background = Sketch.background(rec.sketch);
+        box.innerHTML = Sketch.render(rec.sketch, { animate: false, thumb: true });
+        fig.append(box);
+      } else {
+        const img = el('img');
+        img.src = url; img.loading = 'lazy'; img.decoding = 'async'; img.alt = rec.name;
+        img.addEventListener('error', () => fig.classList.add('broken'));
+        fig.append(img);
+      }
+      const tag = rec.source === 'ai' ? 'AI' : rec.source === 'sketch' ? 'Sketch' : rec.theme ? (themeNames[rec.theme] || rec.theme) : '';
       if (tag) fig.append(el('span', 'tag', (rec.keep && rec.theme ? '♥ ' : '') + tag));
       const del = el('button', 'del', '×');
       del.title = 'Remove';
@@ -323,6 +333,59 @@ else (() => {
     await BR.saveSettings({ blockedSites: sites });
     toast(sites.length ? `Blocking ${sites.length} site${sites.length > 1 ? 's' : ''}` : 'No sites blocked');
     rerun();
+  });
+
+  // ---------- Minimal sketches ----------
+
+  const skPicked = new Set();
+  function skCurrent() { return { style: $('#skStyle').value, text: $('#skText').value.trim() }; }
+  function renderSketchGrid() {
+    const { style, text } = skCurrent();
+    const grid = $('#skGrid');
+    grid.replaceChildren();
+    for (const [id, subj] of Object.entries(Sketch.SUBJECTS)) {
+      const fig = el('figure', 'sk-tile' + (skPicked.has(id) ? ' sel' : ''));
+      const sk = { subject: id, style, text };
+      fig.style.background = Sketch.background(sk);
+      fig.innerHTML = Sketch.render(sk, { animate: false, thumb: true });
+      fig.append(el('figcaption', null, subj.name));
+      fig.title = subj.name;
+      fig.addEventListener('click', () => {
+        skPicked.has(id) ? skPicked.delete(id) : skPicked.add(id);
+        fig.classList.toggle('sel', skPicked.has(id));
+        updateSk();
+      });
+      grid.append(fig);
+    }
+    updateSk();
+  }
+  function updateSk() {
+    const n = skPicked.size;
+    $('#skAdd').disabled = !n;
+    $('#skAdd').textContent = n ? `Add ${n} sketch${n > 1 ? 'es' : ''}` : 'Add selected';
+    $('#skAll').textContent = n === Object.keys(Sketch.SUBJECTS).length ? 'Select none' : 'Select all';
+  }
+  $('#skStyle').addEventListener('change', (e) => { BR.saveSettings({ sketchStyle: e.target.value }); renderSketchGrid(); });
+  $('#skText').addEventListener('input', () => renderSketchGrid());
+  $('#skText').addEventListener('change', (e) => BR.saveSettings({ sketchText: e.target.value.trim() }));
+  $('#skAll').addEventListener('click', () => {
+    const all = Object.keys(Sketch.SUBJECTS);
+    if (skPicked.size === all.length) skPicked.clear(); else all.forEach((k) => skPicked.add(k));
+    renderSketchGrid();
+  });
+  $('#skAdd').addEventListener('click', async () => {
+    const { style, text } = skCurrent();
+    const recs = [...skPicked].map((subject) => ({
+      name: Sketch.SUBJECTS[subject].name + ' sketch', source: 'sketch', keep: true, added: Date.now(),
+      sketch: { subject, style, text }
+    }));
+    const ids = await BR.addRecords(recs);
+    if (ids && ids.length) await BR.saveSettings({ currentId: ids[0], lastChange: Date.now() });
+    skPicked.clear();
+    renderSketchGrid();
+    $('#skStatus').textContent = `Added ${recs.length}. Open a new tab to watch one draw in.`;
+    toast(`Added ${recs.length} sketch${recs.length > 1 ? 'es' : ''} to your backgrounds`);
+    render();
   });
 
   // ---------- Create with AI ----------

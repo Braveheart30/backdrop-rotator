@@ -16,6 +16,24 @@ else (() => {
     if (id === shownId) return true;
     const rec = await BR.getImage(id);
     if (!rec) return false;
+    if (rec.source === 'sketch' && rec.sketch) {
+      const back = layers[1 - front];
+      back.style.backgroundImage = 'none';
+      back.style.background = Sketch.background(rec.sketch);
+      back.innerHTML = Sketch.render(rec.sketch, { animate: true });
+      back.classList.add('visible');
+      layers[front].classList.remove('visible');
+      const old = blobUrl;
+      blobUrl = null;
+      front = 1 - front; shownId = id; currentRec = rec;
+      if (old) setTimeout(() => URL.revokeObjectURL(old), 1500);
+      document.body.classList.add('sketch-mode');
+      document.body.classList.toggle('sketch-light', rec.sketch.style === 'light');
+      updateMeta();
+      announce();
+      return true;
+    }
+    document.body.classList.remove('sketch-mode', 'sketch-light');
     const isBlob = !!rec.blob;
     const url = isBlob ? URL.createObjectURL(rec.blob) : rec.url;
     if (!url) return false;
@@ -23,6 +41,8 @@ else (() => {
     img.src = url;
     try { await img.decode(); } catch (e) { if (isBlob) URL.revokeObjectURL(url); return false; }
     const back = layers[1 - front];
+    back.innerHTML = '';
+    back.style.background = '';
     back.style.backgroundImage = `url("${url.replace(/"/g, '%22')}")`;
     back.classList.add('visible');
     layers[front].classList.remove('visible');

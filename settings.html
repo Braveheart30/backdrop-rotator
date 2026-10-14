@@ -20,7 +20,7 @@
     <h1>Backdrop Rotator</h1>
     <p>Photos from anywhere on the web, AI creations, or your own pictures, rotated onto every Edge new tab.</p>
     <nav class="jump">
-      <a href="#find">Find photos</a><a href="#create">Create with AI</a><a href="#auto">Auto-rotate</a><a href="#eco">Eco mode</a><a href="#page">New tab</a><a href="#library">Library</a>
+      <a href="#find">Find photos</a><a href="#sketches">Sketches</a><a href="#create">Create with AI</a><a href="#auto">Auto-rotate</a><a href="#eco">Eco mode</a><a href="#page">New tab</a><a href="#library">Library</a>
     </nav>
   </header>
 
@@ -59,6 +59,29 @@
         <button class="btn ghost" type="submit">Add</button>
       </form>
     </details>
+  </section>
+
+  <section class="card" id="sketches">
+    <h2>Minimal sketches</h2>
+    <p class="hint">Simple line drawings that draw themselves in, then stay still. Made right here: no AI, no downloads.</p>
+    <div class="ai-grid">
+      <label>Look
+        <select id="skStyle">
+          <option value="neon">Neon blue on black</option>
+          <option value="dark">White on black</option>
+          <option value="light">Black on white</option>
+        </select>
+      </label>
+      <label>Word (optional)
+        <input id="skText" type="text" maxlength="24" placeholder="e.g. FOCUS" autocomplete="off">
+      </label>
+    </div>
+    <div id="skGrid" class="sk-grid"></div>
+    <div class="ai-actions">
+      <button id="skAdd" class="btn" disabled>Add selected</button>
+      <button id="skAll" class="btn ghost">Select all</button>
+      <span id="skStatus" class="note"></span>
+    </div>
   </section>
 
   <section class="card" id="create">
@@ -237,6 +260,7 @@
 
   <script src="js/bridge.js"></script>
   <script src="js/store.js"></script>
+  <script src="js/sketch.js"></script>
   <script src="js/ai.js"></script>
   <script src="js/settings.js"></script>
 </body>

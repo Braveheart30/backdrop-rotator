@@ -11,6 +11,7 @@ html, body {
   opacity: 0; transition: opacity .9s ease;
 }
 .bg.visible { opacity: 1; }
+.bg svg { display: block; width: 100%; height: 100%; }
 #dim { position: fixed; inset: 0; background: #000; opacity: .15; pointer-events: none; }
 
 main {
@@ -74,3 +75,19 @@ body.empty #nextBtn { display: none; }
 }
 #credit:hover { opacity: 1; text-decoration: underline; }
 @media (max-width: 560px) { #credit { max-width: calc(100vw - 180px); } }
+
+/* Sketch backgrounds: clock and search move into a slim top bar so the drawing has the screen. */
+body.sketch-mode main {
+  height: auto; flex-direction: row; align-items: center; justify-content: space-between;
+  padding: 22px 28px; text-shadow: none;
+}
+body.sketch-mode #clock { display: flex; align-items: baseline; gap: 12px; }
+body.sketch-mode #time { font-size: 30px; font-weight: 300; letter-spacing: 0; }
+body.sketch-mode #date { font-size: 13px; margin-top: 0; opacity: .6; }
+body.sketch-mode #search { width: min(340px, 50vw); }
+body.sketch-mode #q { padding: 9px 16px; font-size: 14px; background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.14); backdrop-filter: none; }
+body.sketch-mode.sketch-light main { color: #1d1d1f; }
+body.sketch-mode.sketch-light #q { color: #1d1d1f; background: rgba(0,0,0,.04); border-color: rgba(0,0,0,.12); }
+body.sketch-mode.sketch-light #q::placeholder { color: rgba(0,0,0,.45); }
+body.sketch-mode.sketch-light #controls button { color: #1d1d1f; background: rgba(0,0,0,.05); border-color: rgba(0,0,0,.12); }
+@media (max-width: 640px) { body.sketch-mode #search { display: none; } }

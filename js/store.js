@@ -1,5 +1,5 @@
 // Images, settings, rotation and Bing photo search for Backdrop Rotator.
-const APP_VERSION = '2.2.0';
+const APP_VERSION = '2.3.0';
 
 const BR = (() => {
   // ---------- Storage (lives in the extension, reached through the bridge) ----------
@@ -47,6 +47,9 @@ const BR = (() => {
     filterFaces: true,     // scenes, not close-ups of faces
     filterShops: true,     // skip online stores and marketplaces
     blockedSites: [],      // extra sites the user never wants results from
+    // Minimal sketches
+    sketchStyle: 'neon',
+    sketchText: '',
     // Eco mode
     eco: false,
     aiDay: { d: '', n: 0 }  // AI images made today (for the Eco daily limit)

@@ -1,6 +1,16 @@
 {
-  "latest": "2.2.0",
+  "latest": "2.3.0",
   "versions": [
+    {
+      "version": "2.3.0",
+      "date": "2026-10-14",
+      "notes": [
+        "Minimal sketches: simple line drawings that draw themselves in, then stay still (no AI, no downloads)",
+        "9 subjects: Cybertruck, light-cycle, airliner, monorail, city skyline, castle on a cliff, drone, fighter jet, mountains",
+        "3 looks: neon blue on black, white on black, black on white, plus an optional word like FOCUS",
+        "On sketch backgrounds, the clock and search move to a slim top bar"
+      ]
+    },
     {
       "version": "2.2.0",
       "date": "2026-10-14",
