@@ -104,11 +104,17 @@ const Sketch = (() => {
     light: { name: 'Black on white', bg: '#f5f5f7', stroke: '#1d1d1f', text: '#1d1d1f', glow: false, width: 2 }
   };
 
+  const PATH_OK = /^[MLHVCSQTAZ0-9.,\s-]+$/;
+  const safe = (arr) => (arr || []).filter((d) => typeof d === 'string' && PATH_OK.test(d));
+  const num = (x) => typeof x === 'number' && isFinite(x);
+
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   // Full-screen SVG (1920x1080 frame, scales to fill any screen).
   function render(sk, { animate = true, thumb = false } = {}) {
-    const subj = SUBJECTS[sk.subject] || SUBJECTS.cybertruck;
+    const base = sk.custom || SUBJECTS[sk.subject] || SUBJECTS.cybertruck;
+    const subj = { ...base, paths: safe(base.paths), faint: safe(base.faint),
+      circles: (base.circles || []).filter((c) => Array.isArray(c) && c.length === 3 && c.every(num)) };
     const st = STYLES[sk.style] || STYLES.neon;
     const [w, h] = subj.size;
     const scale = ((thumb ? 1100 : 760) / w) * (subj.zoom || 1);
@@ -139,8 +145,8 @@ const Sketch = (() => {
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
       <defs>${glow}</defs>${css}
       <g transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(${scale.toFixed(4)})" fill="none" stroke="${st.stroke}"
-         stroke-width="${st.width}" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"
-         ${st.glow ? 'filter="url(#g)"' : ''}>${strokes.replace(/<(path|circle) /g, '<$1 vector-effect="non-scaling-stroke" ')}</g>
+         stroke-width="${(st.width / scale).toFixed(3)}" stroke-linecap="round" stroke-linejoin="round"
+         ${st.glow ? 'filter="url(#g)"' : ''}>${strokes}</g>
       ${word}</svg>`;
   }
 

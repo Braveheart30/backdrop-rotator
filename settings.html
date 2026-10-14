@@ -82,6 +82,36 @@
       <button id="skAll" class="btn ghost">Select all</button>
       <span id="skStatus" class="note"></span>
     </div>
+
+    <div class="claude-box">
+      <h3>✨ Sketch anything with Claude</h3>
+      <p class="hint">Name any subject and Claude draws it in the same simple style. Brands become the plain object (a "Disney cruise" becomes a cruise ship), never a logo or character.</p>
+      <form id="clForm" class="theme-form">
+        <input id="clInput" type="text" maxlength="120" placeholder="e.g. cruise ship, Black Hawk helicopter, lighthouse" autocomplete="off" required>
+        <button id="clBtn" class="btn" type="submit">Draw</button>
+      </form>
+      <div id="clStatus" class="status" role="status"></div>
+      <div id="clPreview" hidden>
+        <div id="clCanvas" class="cl-canvas"></div>
+        <div class="ai-actions">
+          <button id="clKeep" class="btn">Add to backgrounds</button>
+          <button id="clAgain" class="btn ghost">Try again</button>
+          <span class="note">It also joins the picker above, so you can use it in any look.</span>
+        </div>
+      </div>
+      <details id="clSettings" class="url-add">
+        <summary>Claude settings</summary>
+        <div class="ai-grid">
+          <label class="wide">Anthropic API key
+            <input id="claudeKey" type="password" placeholder="sk-ant-…" autocomplete="off">
+          </label>
+          <label>Model
+            <select id="claudeModel"></select>
+          </label>
+        </div>
+        <p class="note">Get a key at platform.claude.com → API keys. Anthropic bills your account for each sketch. The key stays in this browser and is only sent to Anthropic. Eco mode always uses Haiku, the lightest model.</p>
+      </details>
+    </div>
   </section>
 
   <section class="card" id="create">
@@ -261,6 +291,7 @@
   <script src="js/bridge.js"></script>
   <script src="js/store.js"></script>
   <script src="js/sketch.js"></script>
+  <script src="js/claude.js"></script>
   <script src="js/ai.js"></script>
   <script src="js/settings.js"></script>
 </body>

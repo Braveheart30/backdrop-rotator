@@ -1,6 +1,16 @@
 {
-  "latest": "2.3.0",
+  "latest": "2.4.0",
   "versions": [
+    {
+      "version": "2.4.0",
+      "date": "2026-10-14",
+      "notes": [
+        "Sketch anything with Claude: name any subject and Claude draws it in the same simple line style",
+        "Claude's drawings join your sketch picker and work in all three looks",
+        "Uses your own Anthropic API key; Eco mode uses Claude Haiku; brands become plain objects, never logos",
+        "Fix: long sketch lines now draw in completely"
+      ]
+    },
     {
       "version": "2.3.0",
       "date": "2026-10-14",

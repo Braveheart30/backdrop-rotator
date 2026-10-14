@@ -52,6 +52,12 @@ else (() => {
     $('#ecoSw').checked = s.eco;
     $('#skStyle').value = s.sketchStyle || 'neon';
     $('#skText').value = s.sketchText || '';
+    customSketches = Array.isArray(s.customSketches) ? s.customSketches : [];
+    $('#claudeModel').replaceChildren(...Object.entries(ClaudeSketch.MODELS).map(([v, label]) => {
+      const o = el('option', null, label); o.value = v; return o;
+    }));
+    $('#claudeModel').value = s.claudeModel || 'claude-sonnet-5-5';
+    $('#claudeKey').value = s.claudeKey || '';
     renderSketchGrid();
     $('#filterFaces').checked = s.filterFaces;
     $('#filterShops').checked = s.filterShops;
@@ -338,18 +344,37 @@ else (() => {
   // ---------- Minimal sketches ----------
 
   const skPicked = new Set();
+  let customSketches = [];
+  const subjectFor = (id) => Sketch.SUBJECTS[id] ? { subject: id } : (() => {
+    const c = customSketches.find((x) => x.id === id);
+    return c ? { subject: id, custom: c } : null;
+  })();
   function skCurrent() { return { style: $('#skStyle').value, text: $('#skText').value.trim() }; }
   function renderSketchGrid() {
     const { style, text } = skCurrent();
     const grid = $('#skGrid');
     grid.replaceChildren();
-    for (const [id, subj] of Object.entries(Sketch.SUBJECTS)) {
+    const all = [...Object.entries(Sketch.SUBJECTS).map(([id, subj]) => [id, subj, null]),
+                 ...customSketches.map((c) => [c.id, c, c])];
+    for (const [id, subj, custom] of all) {
       const fig = el('figure', 'sk-tile' + (skPicked.has(id) ? ' sel' : ''));
-      const sk = { subject: id, style, text };
+      const sk = { subject: id, style, text, custom: custom || undefined };
       fig.style.background = Sketch.background(sk);
       fig.innerHTML = Sketch.render(sk, { animate: false, thumb: true });
-      fig.append(el('figcaption', null, subj.name));
+      fig.append(el('figcaption', null, (custom ? '✨ ' : '') + subj.name));
       fig.title = subj.name;
+      if (custom) {
+        const rm = el('button', 'rm', '×');
+        rm.title = 'Remove from picker';
+        rm.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          customSketches = customSketches.filter((c) => c.id !== id);
+          skPicked.delete(id);
+          await BR.saveSettings({ customSketches });
+          renderSketchGrid();
+        });
+        fig.append(rm);
+      }
       fig.addEventListener('click', () => {
         skPicked.has(id) ? skPicked.delete(id) : skPicked.add(id);
         fig.classList.toggle('sel', skPicked.has(id));
@@ -363,21 +388,21 @@ else (() => {
     const n = skPicked.size;
     $('#skAdd').disabled = !n;
     $('#skAdd').textContent = n ? `Add ${n} sketch${n > 1 ? 'es' : ''}` : 'Add selected';
-    $('#skAll').textContent = n === Object.keys(Sketch.SUBJECTS).length ? 'Select none' : 'Select all';
+    $('#skAll').textContent = n === Object.keys(Sketch.SUBJECTS).length + customSketches.length ? 'Select none' : 'Select all';
   }
   $('#skStyle').addEventListener('change', (e) => { BR.saveSettings({ sketchStyle: e.target.value }); renderSketchGrid(); });
   $('#skText').addEventListener('input', () => renderSketchGrid());
   $('#skText').addEventListener('change', (e) => BR.saveSettings({ sketchText: e.target.value.trim() }));
   $('#skAll').addEventListener('click', () => {
-    const all = Object.keys(Sketch.SUBJECTS);
+    const all = [...Object.keys(Sketch.SUBJECTS), ...customSketches.map((c) => c.id)];
     if (skPicked.size === all.length) skPicked.clear(); else all.forEach((k) => skPicked.add(k));
     renderSketchGrid();
   });
   $('#skAdd').addEventListener('click', async () => {
     const { style, text } = skCurrent();
-    const recs = [...skPicked].map((subject) => ({
-      name: Sketch.SUBJECTS[subject].name + ' sketch', source: 'sketch', keep: true, added: Date.now(),
-      sketch: { subject, style, text }
+    const recs = [...skPicked].map(subjectFor).filter(Boolean).map((sub) => ({
+      name: (sub.custom ? sub.custom.name : Sketch.SUBJECTS[sub.subject].name) + ' sketch',
+      source: 'sketch', keep: true, added: Date.now(), sketch: { ...sub, style, text }
     }));
     const ids = await BR.addRecords(recs);
     if (ids && ids.length) await BR.saveSettings({ currentId: ids[0], lastChange: Date.now() });
@@ -387,6 +412,56 @@ else (() => {
     toast(`Added ${recs.length} sketch${recs.length > 1 ? 'es' : ''} to your backgrounds`);
     render();
   });
+
+  // ---------- Sketch anything with Claude ----------
+
+  let clLast = null;
+  function showClaudePreview() {
+    if (!clLast) return;
+    const sk = { subject: clLast.id, custom: clLast, ...skCurrent() };
+    $('#clCanvas').style.background = Sketch.background(sk);
+    $('#clCanvas').innerHTML = Sketch.render(sk, { animate: true, thumb: true });
+    $('#clPreview').hidden = false;
+  }
+  async function claudeDraw() {
+    const subject = $('#clInput').value.trim();
+    if (!subject) return;
+    const btn = $('#clBtn');
+    if (btn.classList.contains('busy')) return;
+    btn.classList.add('busy'); $('#clAgain').disabled = true;
+    status(`Claude is sketching "${subject}"…`, false, '#clStatus');
+    try {
+      clLast = await ClaudeSketch.draw(subject);
+      status('', false, '#clStatus');
+      $('#clKeep').disabled = false;
+      showClaudePreview();
+    } catch (e) {
+      status(e.message, true, '#clStatus');
+      if (/API key/.test(e.message)) $('#clSettings').open = true;
+    } finally {
+      btn.classList.remove('busy'); $('#clAgain').disabled = false;
+    }
+  }
+  $('#clForm').addEventListener('submit', (e) => { e.preventDefault(); claudeDraw(); });
+  $('#clAgain').addEventListener('click', claudeDraw);
+  $('#clKeep').addEventListener('click', async () => {
+    if (!clLast) return;
+    const { style, text } = skCurrent();
+    const subj = { id: clLast.id, name: clLast.name, size: clLast.size, paths: clLast.paths, circles: clLast.circles, faint: clLast.faint };
+    customSketches = [...customSketches.filter((c) => c.id !== subj.id), subj].slice(-60);
+    await BR.saveSettings({ customSketches });
+    const ids = await BR.addRecords([{ name: subj.name + ' sketch', source: 'sketch', keep: true, added: Date.now(),
+      sketch: { subject: subj.id, custom: subj, style, text } }]);
+    if (ids && ids.length) await BR.saveSettings({ currentId: ids[0], lastChange: Date.now() });
+    $('#clKeep').disabled = true;
+    renderSketchGrid();
+    toast(`Added "${subj.name}". Open a new tab to watch it draw in.`);
+    render();
+  });
+  $('#claudeKey').addEventListener('change', (e) => BR.saveSettings({ claudeKey: e.target.value.trim() }));
+  $('#claudeModel').addEventListener('change', (e) => BR.saveSettings({ claudeModel: e.target.value }));
+  $('#skStyle').addEventListener('change', showClaudePreview);
+  $('#skText').addEventListener('input', showClaudePreview);
 
   // ---------- Create with AI ----------
 

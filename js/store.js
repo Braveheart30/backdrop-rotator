@@ -1,5 +1,5 @@
 // Images, settings, rotation and Bing photo search for Backdrop Rotator.
-const APP_VERSION = '2.3.0';
+const APP_VERSION = '2.4.0';
 
 const BR = (() => {
   // ---------- Storage (lives in the extension, reached through the bridge) ----------
@@ -50,6 +50,9 @@ const BR = (() => {
     // Minimal sketches
     sketchStyle: 'neon',
     sketchText: '',
+    customSketches: [],    // subjects Claude drew for you
+    claudeKey: '',
+    claudeModel: 'claude-sonnet-5-5',
     // Eco mode
     eco: false,
     aiDay: { d: '', n: 0 }  // AI images made today (for the Eco daily limit)
