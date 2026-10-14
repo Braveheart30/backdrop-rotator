@@ -31,7 +31,17 @@
       <input id="searchInput" type="search" placeholder="e.g. F-22 Raptor, Lord of the Rings landscapes, Tokyo at night" autocomplete="off" required>
       <button id="searchBtn" class="btn" type="submit">Search</button>
     </form>
+    <div class="filters">
+      <label class="chk"><input type="checkbox" id="filterFaces"> Scenes, not close-ups of faces</label>
+      <label class="chk"><input type="checkbox" id="filterShops"> Skip online stores &amp; marketplaces</label>
+      <button type="button" id="blockedBtn" class="linkish">Blocked sites…</button>
+    </div>
+    <div id="blockedBox" hidden>
+      <textarea id="blockedSites" rows="3" placeholder="One website per line, e.g. pinterest.com"></textarea>
+      <p class="note">Nothing from these sites shows up in searches or auto-rotation. Amazon, eBay, Etsy, Walmart, AliExpress, Temu, marketplaces and other stores are already skipped while the store filter is on.</p>
+    </div>
     <div id="searchStatus" class="status" role="status"></div>
+    <div id="hiddenNote" class="note"></div>
     <div id="resultsBar" class="results-bar" hidden>
       <span id="pickCount">Click photos to select them</span>
       <div class="actions">

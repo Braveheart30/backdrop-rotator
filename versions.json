@@ -1,6 +1,16 @@
 {
-  "latest": "2.1.0",
+  "latest": "2.2.0",
   "versions": [
+    {
+      "version": "2.2.0",
+      "date": "2026-10-14",
+      "notes": [
+        "Search filters: scenes instead of close-ups of faces (on by default)",
+        "Online stores, marketplaces and stock-photo sellers are skipped (on by default)",
+        "Blocked sites: add any website you never want photos from",
+        "Search shows how many results your filters hid"
+      ]
+    },
     {
       "version": "2.1.0",
       "date": "2026-10-14",

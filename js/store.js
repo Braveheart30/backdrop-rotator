@@ -1,5 +1,5 @@
 // Images, settings, rotation and Bing photo search for Backdrop Rotator.
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.2.0';
 
 const BR = (() => {
   // ---------- Storage (lives in the extension, reached through the bridge) ----------
@@ -43,6 +43,10 @@ const BR = (() => {
     aiFont: 'Bebas Neue',
     aiTextPos: 'center',
     aiTextMode: 'ai',      // 'ai' (model draws it, OpenAI only) | 'overlay'
+    // Search filters
+    filterFaces: true,     // scenes, not close-ups of faces
+    filterShops: true,     // skip online stores and marketplaces
+    blockedSites: [],      // extra sites the user never wants results from
     // Eco mode
     eco: false,
     aiDay: { d: '', n: 0 }  // AI images made today (for the Eco daily limit)
@@ -128,12 +132,68 @@ const BR = (() => {
     return out;
   }
 
-  async function searchImages(q, start = 0, level = null, purpose) {
-    if (level != null) return { results: await bingPage(q, start, FILTERS[level], purpose), level };
-    for (let i = 0; i < FILTERS.length; i++) {
-      const results = await bingPage(q, start, FILTERS[i], purpose);
-      if (results.length >= 12 || i === FILTERS.length - 1) return { results, level: i };
+  // ---------- Result filters ----------
+
+  // Steers Bing toward wide scenes and away from portraits.
+  const SCENE_HINT = ' scene -portrait -closeup -face -headshot';
+
+  // Online stores and marketplaces, matched against the page's site and the image's host.
+  const SHOP_SITES = /(^|\.)(amazon|ebay|etsy|walmart|aliexpress|alibaba|alicdn|temu|shein|target|bestbuy|mercari|poshmark|depop|redbubble|teepublic|zazzle|displate|society6|cafepress|spreadshirt|desertcart|ubuy|fado|snapklik|bigamart|flipkart|rakuten|shopee|lazada|mercadolibre|mercadolivre|wish|dhgate|joom|newegg|kohls|macys|wayfair|overstock|costco|homedepot|lowes|ikea|craigslist|offerup|carousell|gumtree|olx|kijiji|vinted|grailed|stockx|worthpoint|liveauctioneers|bonanza|ebayimg|etsystatic|walmartimages|media-amazon|ssl-images-amazon|shopify|bigcommerce|hobbylink|hlj|turbosquid|cgtrader|renderhub|3dexport|freepik|shutterstock|istockphoto|gettyimages|alamy|dreamstime|depositphotos|123rf|vectorstock|stock\.adobe|canstockphoto|pond5|storyblocks)\./i;
+  const SHOP_WORDS = /(?<!photo)shop|store/i;
+  const SHOP_TITLE = /\b(for sale|buy now|buy online|free shipping|on sale|add to cart|in stock|best price|\$\s?\d|t-?shirts?|hoodies?|sweatshirts?|mugs?|stickers?|decals?|phone case|poster print|canvas print|wall art print|framed print|art print|tapestry|diecast|scale model kit|\d\/\d{2,3} scale|action figure|plush)\b/i;
+
+  function blockedBy(c, s) {
+    const h1 = host(c.page), h2 = host(c.full);
+    const user = (s.blockedSites || []).find((d) => d && [h1, h2].some((h) => h === d || h.endsWith('.' + d)));
+    if (user) return 'blocked';
+    if (!s.filterShops) return null;
+    if (SHOP_SITES.test(h1) || SHOP_SITES.test(h2) || SHOP_WORDS.test(h1) || /\/marketplace\//i.test(c.page) || SHOP_TITLE.test(c.title)) return 'shop';
+    return null;
+  }
+
+  // Images Bing itself classifies as faces or head-and-shoulders portraits, per search.
+  const faceCache = new Map();
+  async function faceKeys(q, level, needPages, purpose) {
+    const k = q + '|' + level;
+    let c = faceCache.get(k);
+    if (!c) faceCache.set(k, (c = { keys: new Set(), pages: 0, done: false }));
+    while (c.pages < needPages && !c.done) {
+      const off = c.pages * 35;
+      const [a, b] = await Promise.all(['+filterui:face-face', '+filterui:face-portrait']
+        .map((f) => bingPage(q, off, FILTERS[level] + f, purpose).catch(() => [])));
+      a.concat(b).forEach((x) => c.keys.add(x.key));
+      if (a.length + b.length < 10) c.done = true;
+      c.pages++;
     }
+    return c.keys;
+  }
+
+  // One page of Bing results with your filters applied.
+  // Returns { results, level, raw (unfiltered count), hidden: { faces, shops, blocked } }.
+  async function searchImages(q, start = 0, level = null, purpose) {
+    const s = await getSettings();
+    const sq = s.filterFaces ? q + SCENE_HINT : q;
+    let raw;
+    if (level != null) raw = await bingPage(sq, start, FILTERS[level], purpose);
+    else {
+      for (let i = 0; i < FILTERS.length; i++) {
+        raw = await bingPage(sq, start, FILTERS[i], purpose);
+        level = i;
+        if (raw.length >= 12) break;
+      }
+    }
+    const hidden = { faces: 0, shops: 0, blocked: 0 };
+    let results = raw.filter((c) => {
+      const why = blockedBy(c, s);
+      if (why === 'shop') hidden.shops++;
+      if (why === 'blocked') hidden.blocked++;
+      return !why;
+    });
+    if (s.filterFaces && results.length) {
+      const fk = await faceKeys(sq, level, Math.floor(start / 35) + 2, purpose);
+      results = results.filter((c) => (fk.has(c.key) ? (hidden.faces++, false) : true));
+    }
+    return { results, level, raw: raw.length, hidden };
   }
 
   async function download(c, { minWidth = 600, landscape = false, purpose } = {}) {
@@ -144,7 +204,7 @@ const BR = (() => {
       const bmp = await createImageBitmap(blob);
       const { width, height } = bmp;
       bmp.close();
-      if (width < minWidth || (landscape && width < height)) return null;
+      if (width < minWidth || (landscape && width < height * 1.3)) return null;
       return {
         name: c.title || host(c.page) || 'Web photo', type: blob.type, blob, added: Date.now(),
         source: 'web', srcKey: c.key,
@@ -206,7 +266,7 @@ const BR = (() => {
     for (let page = 0; page < maxPages && got < want; page++) {
       const res = await searchImages(name, page * 35, level, purpose);
       level = res.level;
-      if (!res.results.length) break;
+      if (!res.raw) break;
       let fresh = res.results.filter((c) => !seen.has(c.key) && !tried.has(c.key));
       if (page === 0 && !fresh.length && seen.size) { seen = new Set(); fresh = res.results; } // seen it all: start over
       if (!fresh.length) { if (++emptyPages >= 3) break; continue; }

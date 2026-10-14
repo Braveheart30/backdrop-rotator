@@ -50,6 +50,9 @@ else (() => {
     $('#dimOut').textContent = s.dim + '%';
     $('#intervalRow').hidden = s.mode !== 'interval';
     $('#ecoSw').checked = s.eco;
+    $('#filterFaces').checked = s.filterFaces;
+    $('#filterShops').checked = s.filterShops;
+    $('#blockedSites').value = (s.blockedSites || []).join('\n');
     updateEco(s.eco);
     updateAiUI();
   }
@@ -189,6 +192,15 @@ else (() => {
   // ---------- Search ----------
 
   let query = '', nextFirst = 0, level = null;
+  let hiddenTotals = { faces: 0, shops: 0, blocked: 0 };
+
+  function showHidden() {
+    const h = hiddenTotals, parts = [];
+    if (h.faces) parts.push(`${h.faces} close-up${h.faces > 1 ? 's' : ''}`);
+    if (h.shops) parts.push(`${h.shops} store listing${h.shops > 1 ? 's' : ''}`);
+    if (h.blocked) parts.push(`${h.blocked} from blocked sites`);
+    $('#hiddenNote').textContent = parts.length ? 'Hidden by your filters: ' + parts.join(', ') + '.' : '';
+  }
   const picks = new Map();
   const shown = new Map();
 
@@ -214,6 +226,8 @@ else (() => {
       const res = await BR.searchImages(query, nextFirst, level);
       level = res.level;
       nextFirst += 35;
+      for (const k in hiddenTotals) hiddenTotals[k] += res.hidden[k];
+      showHidden();
       for (const c of res.results.filter((r) => !shown.has(r.key))) {
         const fig = el('figure', 'pick');
         shown.set(c.key, { c, fig });
@@ -227,8 +241,12 @@ else (() => {
         $('#results').append(fig);
       }
       $('#resultsBar').hidden = !shown.size;
-      $('#moreBtn').hidden = res.results.length < 20;
-      status(shown.size ? '' : `No photos found for "${query}". Try different wording.`, !shown.size, '#searchStatus');
+      $('#moreBtn').hidden = res.raw < 20;
+      const msg = shown.size ? '' : res.raw
+        ? 'Everything on this page was hidden by your filters. Try "Show more results" or turn a filter off.'
+        : `No photos found for "${query}". Try different wording.`;
+      status(msg, !shown.size, '#searchStatus');
+      if (!shown.size && res.raw >= 20) $('#moreBtn').hidden = false;
     } catch (e) {
       status(e.message, true, '#searchStatus');
     } finally {
@@ -242,6 +260,7 @@ else (() => {
     const q = $('#searchInput').value.trim();
     if (!q) return;
     query = q; nextFirst = 0; level = null;
+    hiddenTotals = { faces: 0, shops: 0, blocked: 0 };
     picks.clear(); shown.clear();
     $('#results').replaceChildren();
     updatePicks();
@@ -288,6 +307,22 @@ else (() => {
     } catch (err) {
       status(err.message, true, '#searchStatus');
     }
+  });
+
+  // ---------- Search filters ----------
+
+  function rerun() { if (query) $('#searchForm').requestSubmit(); }
+  $('#filterFaces').addEventListener('change', async (e) => { await BR.saveSettings({ filterFaces: e.target.checked }); rerun(); });
+  $('#filterShops').addEventListener('change', async (e) => { await BR.saveSettings({ filterShops: e.target.checked }); rerun(); });
+  $('#blockedBtn').addEventListener('click', () => { $('#blockedBox').hidden = !$('#blockedBox').hidden; });
+  $('#blockedSites').addEventListener('change', async (e) => {
+    const sites = [...new Set(e.target.value.split(/[\s,]+/)
+      .map((x) => x.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, ''))
+      .filter((x) => /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(x)))];
+    e.target.value = sites.join('\n');
+    await BR.saveSettings({ blockedSites: sites });
+    toast(sites.length ? `Blocking ${sites.length} site${sites.length > 1 ? 's' : ''}` : 'No sites blocked');
+    rerun();
   });
 
   // ---------- Create with AI ----------
