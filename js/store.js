@@ -1,5 +1,5 @@
 // Images, settings, rotation and Bing photo search for Backdrop Rotator.
-const APP_VERSION = '2.4.0';
+const APP_VERSION = '2.4.1';
 
 const BR = (() => {
   // ---------- Storage (lives in the extension, reached through the bridge) ----------

@@ -145,7 +145,7 @@ const Sketch = (() => {
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
       <defs>${glow}</defs>${css}
       <g transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(${scale.toFixed(4)})" fill="none" stroke="${st.stroke}"
-         stroke-width="${(st.width / scale).toFixed(3)}" stroke-linecap="round" stroke-linejoin="round"
+         stroke-width="${((thumb ? st.width * 2.6 : st.width) / scale).toFixed(3)}" stroke-linecap="round" stroke-linejoin="round"
          ${st.glow ? 'filter="url(#g)"' : ''}>${strokes}</g>
       ${word}</svg>`;
   }

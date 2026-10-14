@@ -91,3 +91,5 @@ body.sketch-mode.sketch-light #q { color: #1d1d1f; background: rgba(0,0,0,.04); 
 body.sketch-mode.sketch-light #q::placeholder { color: rgba(0,0,0,.45); }
 body.sketch-mode.sketch-light #controls button { color: #1d1d1f; background: rgba(0,0,0,.05); border-color: rgba(0,0,0,.12); }
 @media (max-width: 640px) { body.sketch-mode #search { display: none; } }
+
+body.sketch-mode #dim { display: none; }

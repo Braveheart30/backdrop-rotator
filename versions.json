@@ -1,6 +1,16 @@
 {
-  "latest": "2.4.0",
+  "latest": "2.4.1",
   "versions": [
+    {
+      "version": "2.4.1",
+      "date": "2026-10-14",
+      "notes": [
+        "Black-on-white sketches stay pure white (the Darken setting now only affects photos)",
+        "Crisper sketch thumbnails in the picker and library",
+        "Tidier settings page: no blank gaps under the search filters and Claude box",
+        "Clearer welcome screen on an empty new tab"
+      ]
+    },
     {
       "version": "2.4.0",
       "date": "2026-10-14",
