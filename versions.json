@@ -1,6 +1,13 @@
 {
-  "latest": "3.4.0",
+  "latest": "3.4.1",
   "versions": [
+    {
+      "version": "3.4.1",
+      "date": "2026-10-15",
+      "notes": [
+        "New ready-made sketch: CH-47 Chinook"
+      ]
+    },
     {
       "version": "3.4.0",
       "date": "2026-10-15",
