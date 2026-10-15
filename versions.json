@@ -1,6 +1,13 @@
 {
-  "latest": "3.4.3",
+  "latest": "3.4.4",
   "versions": [
+    {
+      "version": "3.4.4",
+      "date": "2026-10-15",
+      "notes": [
+        "CH-47 Chinook: accurate cockpit (rounded nose, windshield, pillar, side windows, chin housing, probe)"
+      ]
+    },
     {
       "version": "3.4.3",
       "date": "2026-10-15",
