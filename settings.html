@@ -40,14 +40,28 @@
 
     <div class="claude-box">
       <h3>✨ Ask Claude to draw it</h3>
-      <p class="hint">Describe it in your own words. You can ask for words too, e.g. "a lighthouse on a cliff with the words STAY STRONG". Claude only draws the lines; the app keeps your look.</p>
+      <p class="hint">Describe it in your own words. You can ask for words too, e.g. "a lighthouse on a cliff with the words STAY STRONG". Claude only draws the lines; the app keeps your look. <strong>Free:</strong> uses your regular Claude account, no API key needed.</p>
       <form id="clForm" class="theme-form">
         <input id="clInput" type="text" maxlength="200" placeholder="e.g. cruise ship with the words BON VOYAGE" autocomplete="off" required>
         <button id="clBtn" class="btn" type="submit">Draw</button>
       </form>
       <div id="clStatus" class="status" role="status"></div>
+      <div id="clFree" class="cl-free" hidden>
+        <ol class="cl-steps">
+          <li><span id="clCopied">The message for Claude is copied.</span>
+            <a id="clOpen" class="btn sm" href="https://claude.ai/new" target="_blank" rel="noopener">Open Claude</a>
+            <button id="clCopy" class="btn ghost sm" type="button">Copy again</button>
+            <br><span class="note">In the new chat, paste (Ctrl+V) and send.</span>
+            <textarea id="clPrompt" class="cl-prompt" readonly rows="3" aria-label="Message for Claude"></textarea>
+          </li>
+          <li>Copy Claude's whole reply and paste it here:
+            <textarea id="clReply" class="cl-reply" rows="3" placeholder="Paste Claude's reply here"></textarea>
+            <button id="clUse" class="btn sm" type="button">Use this drawing</button>
+          </li>
+        </ol>
+      </div>
       <details id="clSettings" class="url-add">
-        <summary>Claude settings</summary>
+        <summary>Optional: Anthropic API key (draws without leaving the app, paid)</summary>
         <div class="ai-grid">
           <label class="wide">Anthropic API key
             <input id="claudeKey" type="password" placeholder="sk-ant-…" autocomplete="off">

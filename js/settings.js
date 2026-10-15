@@ -194,6 +194,7 @@ else (() => {
   async function claudeDraw() {
     const prompt = $('#clInput').value.trim();
     if (!prompt) { status('Type what you want Claude to draw first.', true); $('#clInput').focus(); return; }
+    if (!(settings.claudeKey || '').trim()) return freeDraw(prompt);
     const btn = $('#clBtn');
     if (btn.classList.contains('busy')) return;
     btn.classList.add('busy');
@@ -205,11 +206,42 @@ else (() => {
       updateEco();
     } catch (e) {
       status(e.message, true);
-      if (/API key/.test(e.message)) $('#clSettings').open = true;
     } finally {
       btn.classList.remove('busy');
     }
   }
+
+  // Free route: copy a ready-made message, the user pastes it into claude.ai, then pastes the reply back.
+  async function copyPrompt() {
+    const ta = $('#clPrompt');
+    let ok = false;
+    try { await navigator.clipboard.writeText(ta.value); ok = true; } catch (e) {}
+    if (!ok) { try { ta.focus(); ta.select(); ok = document.execCommand('copy'); } catch (e) {} }
+    $('#clCopied').textContent = ok ? 'The message for Claude is copied.' : 'Copy the message below (click it, Ctrl+A, Ctrl+C).';
+    return ok;
+  }
+  async function freeDraw(prompt) {
+    status('');
+    $('#clPrompt').value = ClaudeSketch.chatPrompt(prompt);
+    $('#clReply').value = '';
+    $('#clFree').hidden = false;
+    await copyPrompt();
+    $('#clFree').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+  function usePasted() {
+    const raw = $('#clReply').value.trim();
+    if (!raw) { status("Paste Claude's reply into the box first.", true); return; }
+    try {
+      const r = ClaudeSketch.fromPaste(raw);
+      status('');
+      const again = () => { status('For another version, ask Claude "draw it again", then paste the new reply.'); $('#clReply').value = ''; $('#clReply').focus(); };
+      showPreview({ ...r, id: 'c' + Date.now().toString(36), prompt: $('#clInput').value.trim(), by: 'claude' }, again,
+        r.text ? `Claude added the word "${r.text}". You can change it.` : '');
+    } catch (e) { status(e.message, true); }
+  }
+  $('#clCopy').addEventListener('click', copyPrompt);
+  $('#clUse').addEventListener('click', usePasted);
+  $('#clReply').addEventListener('paste', () => setTimeout(usePasted, 0));
   $('#clForm').addEventListener('submit', (e) => { e.preventDefault(); claudeDraw(); });
   $('#claudeKey').addEventListener('change', (e) => save({ claudeKey: e.target.value.trim() }));
   $('#claudeModel').addEventListener('change', (e) => save({ claudeModel: e.target.value }));

@@ -1,6 +1,14 @@
 {
-  "latest": "3.0.1",
+  "latest": "3.1.0",
   "versions": [
+    {
+      "version": "3.1.0",
+      "date": "2026-10-14",
+      "notes": [
+        "Claude sketches are free: no API key needed, use your regular Claude account",
+        "An API key is still optional for drawing without leaving the app"
+      ]
+    },
     {
       "version": "3.0.1",
       "date": "2026-10-14",

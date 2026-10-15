@@ -113,5 +113,15 @@ Reply with ONLY a JSON object, no prose, no code fences:
     return { ...result, id: 'c' + Date.now().toString(36), prompt: subject, model };
   }
 
-  return { MODELS, draw, validate, shellOk };
+  // Free route: the message to paste into a regular Claude chat (no API key needed).
+  function chatPrompt(subject) {
+    subject = String(subject || '').trim().slice(0, 200);
+    return SYSTEM + '\n\nSketch request: ' + subject;
+  }
+  function fromPaste(text) {
+    try { return parseReply(String(text || '')); }
+    catch (e) { throw new Error("That doesn't look like a drawing from Claude. Copy Claude's whole reply (the part in { } braces) and paste it again."); }
+  }
+
+  return { MODELS, draw, validate, shellOk, chatPrompt, fromPaste };
 })();
