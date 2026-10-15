@@ -120,7 +120,7 @@ Reply with ONLY a JSON object, no prose, no code fences:
   }
   function fromPaste(text) {
     try { return parseReply(String(text || '')); }
-    catch (e) { throw new Error("That doesn't look like a drawing from Claude. Copy Claude's whole reply (the part in { } braces) and paste it again."); }
+    catch (e) { throw new Error("That isn't Sketch Studio code. In Sketch Studio, click Copy for the app, then paste here."); }
   }
 
   return { MODELS, draw, validate, shellOk, chatPrompt, fromPaste };

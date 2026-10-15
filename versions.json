@@ -1,6 +1,13 @@
 {
-  "latest": "3.1.0",
+  "latest": "3.2.0",
   "versions": [
+    {
+      "version": "3.2.0",
+      "date": "2026-10-14",
+      "notes": [
+        "Sketch Studio: Claude draws anything for free on your Claude plan; paste once to add all your sketches"
+      ]
+    },
     {
       "version": "3.1.0",
       "date": "2026-10-14",

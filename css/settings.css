@@ -271,3 +271,4 @@ figure .sk-thumb svg { display: block; width: 100%; height: 100%; }
 .cl-prompt, .cl-reply { display: block; width: 100%; box-sizing: border-box; margin-top: 6px; font: 12px/1.4 ui-monospace, Consolas, monospace;
   background: transparent; color: inherit; border: 1px solid var(--line); border-radius: 8px; padding: 8px; resize: vertical; }
 .cl-prompt { opacity: .7; }
+a.btn { text-decoration: none; display: inline-block; }

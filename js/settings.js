@@ -194,7 +194,6 @@ else (() => {
   async function claudeDraw() {
     const prompt = $('#clInput').value.trim();
     if (!prompt) { status('Type what you want Claude to draw first.', true); $('#clInput').focus(); return; }
-    if (!(settings.claudeKey || '').trim()) return freeDraw(prompt);
     const btn = $('#clBtn');
     if (btn.classList.contains('busy')) return;
     btn.classList.add('busy');
@@ -210,40 +209,36 @@ else (() => {
       btn.classList.remove('busy');
     }
   }
-
-  // Free route: copy a ready-made message, the user pastes it into claude.ai, then pastes the reply back.
-  async function copyPrompt() {
-    const ta = $('#clPrompt');
-    let ok = false;
-    try { await navigator.clipboard.writeText(ta.value); ok = true; } catch (e) {}
-    if (!ok) { try { ta.focus(); ta.select(); ok = document.execCommand('copy'); } catch (e) {} }
-    $('#clCopied').textContent = ok ? 'The message for Claude is copied.' : 'Copy the message below (click it, Ctrl+A, Ctrl+C).';
-    return ok;
-  }
-  async function freeDraw(prompt) {
-    status('');
-    $('#clPrompt').value = ClaudeSketch.chatPrompt(prompt);
-    $('#clReply').value = '';
-    $('#clFree').hidden = false;
-    await copyPrompt();
-    $('#clFree').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }
-  function usePasted() {
-    const raw = $('#clReply').value.trim();
-    if (!raw) { status("Paste Claude's reply into the box first.", true); return; }
-    try {
-      const r = ClaudeSketch.fromPaste(raw);
-      status('');
-      const again = () => { status('For another version, ask Claude "draw it again", then paste the new reply.'); $('#clReply').value = ''; $('#clReply').focus(); };
-      showPreview({ ...r, id: 'c' + Date.now().toString(36), prompt: $('#clInput').value.trim(), by: 'claude' }, again,
-        r.text ? `Claude added the word "${r.text}". You can change it.` : '');
-    } catch (e) { status(e.message, true); }
-  }
-  $('#clCopy').addEventListener('click', copyPrompt);
-  $('#clUse').addEventListener('click', usePasted);
-  $('#clReply').addEventListener('paste', () => setTimeout(usePasted, 0));
   $('#clForm').addEventListener('submit', (e) => { e.preventDefault(); claudeDraw(); });
-  $('#claudeKey').addEventListener('change', (e) => save({ claudeKey: e.target.value.trim() }));
+  const syncKeyBox = () => { $('#clKeyBox').hidden = !(settings.claudeKey || '').trim(); };
+
+  // Paste from Sketch Studio: {"backdropSketches":[...]} (any number), or a single drawing.
+  async function importPasted() {
+    const raw = $('#clReply').value.trim();
+    if (!raw) return;
+    let list = null;
+    try { const j = JSON.parse(raw); if (j && Array.isArray(j.backdropSketches)) list = j.backdropSketches; } catch (e) {}
+    const items = [];
+    try {
+      if (list) { for (const x of list.slice(0, 60)) { try { items.push({ ...ClaudeSketch.validate(x), prompt: String(x.prompt || '').slice(0, 200) }); } catch (e) {} } }
+      else items.push(ClaudeSketch.fromPaste(raw));
+    } catch (e) { status(e.message, true); return; }
+    if (!items.length) { status("That code didn't contain any drawings. In Sketch Studio, keep a sketch, then click Copy for the app.", true); return; }
+    const stamp = Date.now().toString(36);
+    const saved = items.map((it, i) => ({ id: 'c' + stamp + i, name: it.name, size: it.size, paths: it.paths, circles: it.circles, faint: it.faint, by: 'claude', text: it.text }));
+    await save({ customSketches: [...customs(), ...saved.map(({ text, ...c }) => c)].slice(-60) });
+    const ids = await BR.addRecords(saved.map(({ text, ...c }, i) => ({ name: c.name, source: 'sketch', added: Date.now() + i,
+      sketch: { subject: c.id, custom: c, text: saved[i].text } })));
+    if (ids && ids.length) await save({ currentId: ids[0], lastChange: Date.now() });
+    $('#clReply').value = '';
+    renderPicker();
+    renderLibrary();
+    status('');
+    toast(saved.length === 1 ? `Added "${saved[0].name}". Open a new tab to watch it draw in.` : `Added ${saved.length} sketches from Sketch Studio.`);
+  }
+  $('#clReply').addEventListener('paste', () => setTimeout(importPasted, 0));
+  $('#clReply').addEventListener('change', importPasted);
+  $('#claudeKey').addEventListener('change', async (e) => { await save({ claudeKey: e.target.value.trim() }); syncKeyBox(); });
   $('#claudeModel').addEventListener('change', (e) => save({ claudeModel: e.target.value }));
 
   // ---------- Library ----------
@@ -352,6 +347,6 @@ else (() => {
   Bridge.onStorage((c) => { if ('currentId' in c) { BR.getSettings().then((s) => { settings = s; renderLibrary(); }); } });
 
   loadSettings()
-    .then(() => { renderLookPreview(); renderPicker(); return Promise.all([renderLibrary(), showSafetyInfo(), updateFooter()]); })
+    .then(() => { syncKeyBox(); renderLookPreview(); renderPicker(); return Promise.all([renderLibrary(), showSafetyInfo(), updateFooter()]); })
     .finally(() => Bridge.ready());
 })();
