@@ -1,6 +1,13 @@
 {
-  "latest": "3.5.0",
+  "latest": "3.6.0",
   "versions": [
+    {
+      "version": "3.6.0",
+      "date": "2026-10-15",
+      "notes": [
+        "Per-sketch animation controls (word, motion, speed), motion speed setting, realistic spinning rotors; Claude sketches can have spinning parts"
+      ]
+    },
     {
       "version": "3.5.0",
       "date": "2026-10-15",

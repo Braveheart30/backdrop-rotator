@@ -18,7 +18,7 @@ const Sketch = (() => {
         'M242.4 191.9 V201.5 M266.8 191.9 V210.2 M498.1 191.9 V200.6 M503.3 187.5 H543.4 V198.0 H506.8',
         'M342.8 103.8 V93.3 H358.5 M249.4 100.3 V88.1 M285.2 102.0 V91.5 M139.5 97.7 L207.5 100.3 M327.0 192.8 V199.7 M388.1 192.8 V198.0'
       ],
-      rotors: [{ hub: [130.7, 48.8], d: 'M-208.5 23.5 L-7.8 1.7 M7.9 0.0 L309.8 -7.0' }, { hub: [499.8, 34.8], d: 'M-287.9 38.4 L-5.2 1.8 M5.2 0.0 L155.3 -14.8', reverse: true }],
+      rotors: [{ hub: [130.7, 48.8], r: 300, blades: 3 }, { hub: [499.8, 34.8], r: 300, blades: 3, reverse: true }],
       circles: [[130.7,  48.8,  3.5],  [499.8,  34.8,  3.5],  [123.8,  120.3,  3.9],  [156.9,  136.9,  8.7],  [245.0,  136.9,  9.2],  [317.4,  139.5,  8.7],  [384.6,  142.1,  8.4],  [450.1,  143.9,  8.4],  [242.4,  201.5,  11.3],  [242.4,  201.5,  4.4],  [266.8,  210.2,  13.1],  [266.8,  210.2,  4.4],  [498.1,  200.6,  10.5],  [498.1,  200.6,  3.5],  [259.9,  129.1,  2.2]],
       faint: [
         'M179.6 112.5 L414.3 117.7 M218.9 109.0 V153.5 M279.9 110.7 V154.4 M345.4 112.5 V155.2 M410.8 114.2 V156.1 M201.4 171.8 L511.1 175.3 M98.5 178.8 L131.6 180.5 M437.0 74.1 L480.6 72.3 M86.2 102.0 L179.6 96.8 M96.7 67.1 V100.3 M102.8 67.1 V100.3',
@@ -163,6 +163,8 @@ const Sketch = (() => {
   const cleanText = (t) => String(t || '').replace(/[^\p{L}\p{N} .,'!?&:-]/gu, '').trim().toUpperCase().slice(0, 24);
 
   // Motion styles shown in settings. "auto" picks per sketch (spinning rotors when it has them, else a gentle float).
+  const SPEEDS = { slow: 'Slow', normal: 'Normal', fast: 'Fast' };
+  const SPEED_X = { slow: 1.7, normal: 1, fast: 0.55 };
   const MOTIONS = { auto: 'Auto (best for each sketch)', glow: 'Breathing glow', float: 'Gentle float', sweep: 'Light sweep', stars: 'Starfield', off: 'Off' };
 
   function rng0(seed) { let s = seed >>> 0 || 1; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
@@ -174,7 +176,7 @@ const Sketch = (() => {
     const base = sk.custom || SUBJECTS[sk.subject] || SUBJECTS.cybertruck;
     const subj = { ...base, paths: safe(base.paths), faint: safe(base.faint),
       circles: (base.circles || []).filter((c) => Array.isArray(c) && c.length === 3 && c.every(num)),
-      rotors: (Array.isArray(base.rotors) ? base.rotors : []).filter((r) => r && Array.isArray(r.hub) && r.hub.length === 2 && r.hub.every(num) && typeof r.d === 'string' && PATH_OK.test(r.d)).slice(0, 4) };
+      rotors: (Array.isArray(base.rotors) ? base.rotors : []).filter((r) => r && Array.isArray(r.hub) && r.hub.length === 2 && r.hub.every(num) && num(r.r) && r.r > 2 && r.r < 900).slice(0, 4) };
     const size = Array.isArray(subj.size) && subj.size.every(num) ? subj.size : [600, 230];
     const st = theme(look);
     const animate = look.animate !== false && !thumb;
@@ -189,24 +191,46 @@ const Sketch = (() => {
     const step = Math.min(0.35, 3 / Math.max(1, count)); // detailed sketches still finish drawing in ~3-4 s
     const anim = () => (animate ? ` class="d" style="animation-delay:${(0.15 + step * i++).toFixed(2)}s"` : '');
     const drawn = animate ? 0.15 + step * count + 1.8 : 0;          // when the draw-in is finished
-    let motion = thumb || reducedMotion() ? 'off' : (MOTIONS[look.motion] ? look.motion : 'off');
+    // Per-sketch choices win over the default; Eco mode (look.still) and reduced-motion keep everything still.
+    const pick = sk.motion && MOTIONS[sk.motion] ? sk.motion : look.motion;
+    let motion = thumb || look.still || reducedMotion() ? 'off' : (MOTIONS[pick] ? pick : 'off');
     if (motion === 'auto') motion = subj.rotors.length ? 'rotors' : 'float';
-    const spin = motion === 'rotors' || (motion !== 'off' && subj.rotors.length > 0);
-    const rotors = subj.rotors.map((r, n) => `<g transform="translate(${r.hub[0]} ${r.hub[1]})"><path d="${r.d}" pathLength="1"${anim()}>${spin
-      ? `<animateTransform attributeName="transform" type="scale" values="${r.reverse ? '-1 1;1 1;-1 1' : '1 1;-1 1;1 1'}" dur="0.9s" begin="${(drawn + n * 0.2).toFixed(2)}s" repeatCount="indefinite"/>` : ''}</path></g>`).join('');
+    const sp = SPEED_X[sk.speed] || SPEED_X[look.speed] || 1;
+    const spin = motion !== 'off' && subj.rotors.length > 0;
+    // Rotors seen from the side: blades travel around a flat disc (an ellipse), so they sweep realistically.
+    const SQ = 0.065, STEPS = 24;
+    const rotors = subj.rotors.map((r, n) => {
+      const R = r.r, nb = Math.min(Math.max(Math.round(r.blades || 2), 2), 6), dir = r.reverse ? -1 : 1;
+      const dur = (1.5 * sp).toFixed(2) + 's', begin = (drawn + n * 0.17).toFixed(2) + 's';
+      const pt = (a) => [(R * Math.cos(a)).toFixed(1), (R * SQ * Math.sin(a)).toFixed(1)];
+      let blades = '';
+      for (let b = 0; b < nb; b++) {
+        const a0 = (b / nb) * Math.PI * 2 + 0.35;
+        const [x2, y2] = pt(a0);
+        let a = '';
+        if (spin) {
+          const xs = [], ys = [];
+          for (let k = 0; k <= STEPS; k++) { const [px, py] = pt(a0 + dir * (k / STEPS) * Math.PI * 2); xs.push(px); ys.push(py); }
+          a = `<animate attributeName="x2" values="${xs.join(';')}" dur="${dur}" begin="${begin}" repeatCount="indefinite"/><animate attributeName="y2" values="${ys.join(';')}" dur="${dur}" begin="${begin}" repeatCount="indefinite"/>`;
+        }
+        blades += `<line x1="0" y1="0" x2="${x2}" y2="${y2}">${a}</line>`;
+      }
+      const disc = spin ? `<ellipse cx="0" cy="0" rx="${R}" ry="${(R * SQ).toFixed(1)}" opacity=".22"/>` : '';
+      return `<g transform="translate(${r.hub[0]} ${r.hub[1]})"${animate ? ` class="t" style="animation-delay:${(0.15 + step * i++).toFixed(2)}s"` : ''}>${disc}${blades}<circle cx="0" cy="0" r="${(R * 0.012 + 1.5).toFixed(1)}"/></g>`;
+    }).join('');
     const strokes = [
       ...subj.faint.map((d) => `<path d="${d}" pathLength="1" opacity="${num(subj.weight) ? '.5' : '.28'}"${anim()}/>`),
       ...subj.paths.map((d) => `<path d="${d}" pathLength="1"${anim()}/>`),
       ...subj.circles.map(([cx, cy, r]) => `<circle cx="${cx}" cy="${cy}" r="${r}" pathLength="1"${anim()}/>`)
     ].join('') + rotors;
     const glowAnim = motion === 'glow' && st.glow
-      ? `<animate attributeName="stdDeviation" values="5;10;5" dur="5s" begin="${drawn.toFixed(2)}s" repeatCount="indefinite"/>` : '';
+      ? `<animate attributeName="stdDeviation" values="5;10;5" dur="${(5 * sp).toFixed(1)}s" begin="${drawn.toFixed(2)}s" repeatCount="indefinite"/>` : '';
     const glow = st.glow
       ? `<filter id="g" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="5" result="b">${glowAnim}</feGaussianBlur><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`
       : '';
     // Light sweep: a soft band of light that passes across the lines every few seconds.
     const sweepDefs = motion === 'sweep'
-      ? `<linearGradient id="swg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity="1"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient><mask id="swm" maskUnits="userSpaceOnUse" x="0" y="0" width="1920" height="1080"><rect x="-700" y="0" width="560" height="1080" fill="url(#swg)" transform="skewX(-18)"><animate attributeName="x" values="-700;-700;2500" keyTimes="0;.4;1" dur="6s" begin="${drawn.toFixed(2)}s" repeatCount="indefinite"/></rect></mask>`
+      ? `<linearGradient id="swg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity="1"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient><mask id="swm" maskUnits="userSpaceOnUse" x="0" y="0" width="1920" height="1080"><rect x="-700" y="0" width="560" height="1080" fill="url(#swg)" transform="skewX(-18)"><animate attributeName="x" values="-700;-700;2500" keyTimes="0;.4;1" dur="${(6 * sp).toFixed(1)}s" begin="${drawn.toFixed(2)}s" repeatCount="indefinite"/></rect></mask>`
       : '';
     // Starfield: faint twinkling points, kept away from the drawing.
     let stars = '';
@@ -215,14 +239,14 @@ const Sketch = (() => {
       for (let n = 0; n < 70; n++) {
         const sx = Math.round(r() * 1920), sy = Math.round(r() * 1080), rad = (0.8 + r() * 1.6).toFixed(1);
         if (sx > x - 60 && sx < x + w * scale + 60 && sy > y - 80 && sy < y + h * scale + 60) continue;
-        const d = (2.5 + r() * 4).toFixed(1), b = (drawn + r() * 4).toFixed(1);
+        const d = ((2.5 + r() * 4) * sp).toFixed(1), b = (drawn + r() * 4).toFixed(1);
         stars += `<circle cx="${sx}" cy="${sy}" r="${rad}" fill="${st.text}" opacity=".15"><animate attributeName="opacity" values=".1;.75;.1" dur="${d}s" begin="${b}s" repeatCount="indefinite"/></circle>`;
       }
     }
     const css = `<style>${animate ? `.d{stroke-dasharray:1;stroke-dashoffset:1;animation:draw 1.8s cubic-bezier(.6,.05,.3,1) forwards}
          .t{opacity:0;animation:fade 1.6s ease forwards;animation-delay:${(0.4 + step * i).toFixed(2)}s}
          @keyframes draw{to{stroke-dashoffset:0}}@keyframes fade{to{opacity:1}}` : ''}
-         ${motion === 'float' ? `.fl{animation:fl 7s ease-in-out ${drawn.toFixed(2)}s infinite}@keyframes fl{0%,100%{transform:translateY(0)}50%{transform:translateY(-16px)}}` : ''}
+         ${motion === 'float' ? `.fl{animation:fl ${(7 * sp).toFixed(1)}s ease-in-out ${drawn.toFixed(2)}s infinite}@keyframes fl{0%,100%{transform:translateY(0)}50%{transform:translateY(-16px)}}` : ''}
          @media (prefers-reduced-motion: reduce){.d,.t,.fl{animation:none;stroke-dashoffset:0;opacity:1;transform:none}}</style>`;
     const ty = below ? Math.round(y + h * scale + 120) : Math.round(y - 70);
     const word = text
@@ -323,5 +347,5 @@ const Sketch = (() => {
     return { id: 'g' + seed.toString(36), name: g.name, kind: k, ...out };
   }
 
-  return { MOTIONS, SUBJECTS, LOOKS, ACCENTS, GENERATORS, render, background, isLight, generate, cleanText };
+  return { MOTIONS, SPEEDS, SUBJECTS, LOOKS, ACCENTS, GENERATORS, render, background, isLight, generate, cleanText };
 })();

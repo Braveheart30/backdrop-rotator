@@ -1,6 +1,6 @@
 // Library, settings and rotation for Backdrop Rotator (sketch-only edition).
 // Nothing here downloads images from the web: every background is a line drawing stored as a few numbers.
-const APP_VERSION = '3.5.0';
+const APP_VERSION = '3.6.0';
 
 const BR = (() => {
   // ---------- Storage (lives in the extension, reached through the bridge) ----------
@@ -15,6 +15,14 @@ const BR = (() => {
   const deleteMany = (ids) => (ids.length ? db(ids.map((id) => ({ method: 'delete', args: [id] }))) : Promise.resolve());
 
   const isSketch = (r) => r && r.source === 'sketch' && r.sketch;
+  // One-time: the Chinook goes without a word (as asked).
+  async function migrate() {
+    const s = await getSettings();
+    if (s.migChinookWord) return;
+    const all = await getAll();
+    for (const r of all) if (isSketch(r) && r.sketch.subject === 'chinook' && r.sketch.text) { r.sketch.text = ''; await putImage(r); }
+    await saveSettings({ migChinookWord: true });
+  }
   const getSketches = async () => (await getAll()).filter(isSketch);
   const getSketchIds = async () => (await getSketches()).map((r) => r.id);
   // Older versions saved photos; they're kept until you delete them, but never shown.
@@ -27,6 +35,9 @@ const BR = (() => {
     textPos: 'above',      // 'above' | 'below'
     animate: true,         // draw-in animation
     motion: 'auto',        // ambient motion after drawing (see Sketch.MOTIONS)
+    motionSpeed: 'normal', // slow | normal | fast
+    migChinookWord: false,
+    editStamp: 0,          // bumped when a sketch's own settings change, so open tabs redraw it
     sketchText: '',        // default word for new sketches
     customSketches: [],    // drawings made by Claude or "Surprise me", reusable in the picker
     // New tab
@@ -54,7 +65,7 @@ const BR = (() => {
 
   const getSettings = () => Bridge.call('storage.get', DEFAULTS);
   const saveSettings = (patch) => Bridge.call('storage.set', patch);
-  const look = (s) => ({ style: s.sketchStyle, accent: s.accent, textPos: s.textPos, animate: s.animate, motion: s.eco ? 'off' : (s.motion || 'auto') });
+  const look = (s) => ({ style: s.sketchStyle, accent: s.accent, textPos: s.textPos, animate: s.animate, motion: s.motion || 'auto', speed: s.motionSpeed || 'normal', still: !!s.eco });
 
   function shuffle(a) {
     for (let i = a.length - 1; i > 0; i--) {
@@ -100,6 +111,6 @@ const BR = (() => {
 
   return {
     addRecords, putImage, getImage, getAll, deleteImage, deleteMany, getSketches, getSketchIds, legacyIds, isSketch,
-    DEFAULTS, ECO, getSettings, saveSettings, look, isDue, msUntilNext, advance, webFetch
+    migrate, DEFAULTS, ECO, getSettings, saveSettings, look, isDue, msUntilNext, advance, webFetch
   };
 })();

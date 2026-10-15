@@ -46,6 +46,18 @@ else (() => {
       const o = el('option', null, label); o.value = v; return o;
     }));
     $('#motion').value = s.motion || 'auto';
+    $('#motionSpeed').replaceChildren(...Object.entries(Sketch.SPEEDS).map(([v, label]) => {
+      const o = el('option', null, label); o.value = v; return o;
+    }));
+    $('#motionSpeed').value = s.motionSpeed || 'normal';
+    $('#edMotion').replaceChildren(el('option', null, 'Use my default'), ...Object.entries(Sketch.MOTIONS).map(([v, label]) => {
+      const o = el('option', null, label); o.value = v; return o;
+    }));
+    $('#edMotion').firstChild.value = '';
+    $('#edSpeed').replaceChildren(el('option', null, 'Use my default'), ...Object.entries(Sketch.SPEEDS).map(([v, label]) => {
+      const o = el('option', null, label); o.value = v; return o;
+    }));
+    $('#edSpeed').firstChild.value = '';
     renderSwatches();
     updateEco();
   }
@@ -71,7 +83,7 @@ else (() => {
   function renderLookPreview() {
     const box = $('#lookPreview');
     box.style.background = Sketch.background(look());
-    box.innerHTML = Sketch.render({ subject: 'chinook', text: settings.sketchText || 'FOCUS' }, look(), {});
+    box.innerHTML = Sketch.render({ subject: 'chinook', text: '' }, look(), {});
   }
   function renderAllLooks() {
     renderSwatches();
@@ -243,6 +255,47 @@ else (() => {
   $('#claudeKey').addEventListener('change', async (e) => { await save({ claudeKey: e.target.value.trim() }); syncKeyBox(); });
   $('#claudeModel').addEventListener('change', (e) => save({ claudeModel: e.target.value }));
 
+  // ---------- Per-sketch editor (word, motion, speed) ----------
+  let editing = null;
+  function editDraft() {
+    if (!editing) return null;
+    return { ...editing.sketch, text: Sketch.cleanText($('#edText').value),
+      motion: $('#edMotion').value || undefined, speed: $('#edSpeed').value || undefined };
+  }
+  function renderEditor() {
+    const d = editDraft();
+    if (!d) return;
+    const box = $('#edCanvas');
+    box.style.background = Sketch.background(look());
+    box.innerHTML = Sketch.render(d, look(), {});
+    $('#edNote').textContent = settings.eco ? 'Eco mode is on, so motion is paused everywhere until you turn it off.' : '';
+  }
+  function openEditor(rec) {
+    editing = rec;
+    $('#edName').textContent = rec.name || 'Sketch';
+    $('#edText').value = rec.sketch.text || '';
+    $('#edMotion').value = rec.sketch.motion || '';
+    $('#edSpeed').value = rec.sketch.speed || '';
+    $('#editor').hidden = false;
+    renderEditor();
+    $('#editor').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+  $('#edText').addEventListener('input', renderEditor);
+  $('#edMotion').addEventListener('change', renderEditor);
+  $('#edSpeed').addEventListener('change', renderEditor);
+  $('#edClose').addEventListener('click', () => { editing = null; $('#editor').hidden = true; $('#edCanvas').replaceChildren(); });
+  $('#edSave').addEventListener('click', async () => {
+    if (!editing) return;
+    const d = editDraft();
+    editing.sketch.text = d.text;
+    if (d.motion) editing.sketch.motion = d.motion; else delete editing.sketch.motion;
+    if (d.speed) editing.sketch.speed = d.speed; else delete editing.sketch.speed;
+    await BR.putImage(editing);
+    await save({ currentId: editing.id, lastChange: Date.now(), editStamp: Date.now() });
+    toast(`Saved "${editing.name}". It's showing on your new tab now.`);
+    renderLibrary();
+  });
+
   // ---------- Library ----------
   async function renderLibrary() {
     const [all, legacy] = await Promise.all([BR.getSketches(), BR.legacyIds()]);
@@ -258,17 +311,9 @@ else (() => {
       fig.append(box);
       fig.title = `${rec.name} (click to show now)`;
       if (rec.sketch.text) fig.append(el('span', 'word', rec.sketch.text));
-      const edit = el('button', 'edit', '✎');
-      edit.title = 'Change the word';
-      edit.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const v = prompt('Word on this sketch (leave empty for none):', rec.sketch.text || '');
-        if (v === null) return;
-        rec.sketch.text = Sketch.cleanText(v);
-        await BR.putImage(rec);
-        await save({ lastChange: Date.now(), currentId: rec.id });
-        renderLibrary();
-      });
+      const edit = el('button', 'edit', '⚙');
+      edit.title = 'Word, motion and speed for this sketch';
+      edit.addEventListener('click', (e) => { e.stopPropagation(); openEditor(rec); });
       const del = el('button', 'del', '×');
       del.title = 'Remove';
       del.addEventListener('click', async (e) => { e.stopPropagation(); await BR.deleteImage(rec.id); renderLibrary(); });
@@ -300,7 +345,8 @@ else (() => {
   $('#sketchStyle').addEventListener('change', async (e) => { await save({ sketchStyle: e.target.value }); renderAllLooks(); });
   $('#textPos').addEventListener('change', async (e) => { await save({ textPos: e.target.value }); renderLookPreview(); renderPreview(); });
   $('#animate').addEventListener('change', (e) => save({ animate: e.target.checked }));
-  $('#motion').addEventListener('change', async (e) => { await save({ motion: e.target.value }); renderLookPreview(); });
+  $('#motion').addEventListener('change', async (e) => { await save({ motion: e.target.value }); renderLookPreview(); renderEditor(); });
+  $('#motionSpeed').addEventListener('change', async (e) => { await save({ motionSpeed: e.target.value }); renderLookPreview(); renderEditor(); });
   $('#clockStyle').addEventListener('change', (e) => save({ clockStyle: e.target.value }));
   for (const k of ['clock24', 'showDate', 'showSeconds', 'search']) $('#' + k).addEventListener('change', (e) => save({ [k]: e.target.checked }));
   $('#mode').addEventListener('change', (e) => {
@@ -353,6 +399,6 @@ else (() => {
   Bridge.onStorage((c) => { if ('studioInbox' in c) syncStudio(); if ('currentId' in c) { BR.getSettings().then((s) => { settings = s; renderLibrary(); }); } });
 
   loadSettings()
-    .then(async () => { await syncStudio(); syncKeyBox(); renderLookPreview(); renderPicker(); return Promise.all([renderLibrary(), showSafetyInfo(), updateFooter()]); })
+    .then(async () => { await BR.migrate().catch(() => 0); await syncStudio(); syncKeyBox(); renderLookPreview(); renderPicker(); return Promise.all([renderLibrary(), showSafetyInfo(), updateFooter()]); })
     .finally(() => Bridge.ready());
 })();

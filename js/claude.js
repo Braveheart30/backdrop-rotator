@@ -50,6 +50,10 @@ Reply with ONLY a JSON object, no prose, no code fences:
     const out = { name, text, size: [w, h], paths, circles, faint };
     if (num(obj.zoom)) out.zoom = Math.min(Math.max(obj.zoom, 0.5), 2.2);
     if (num(obj.weight)) out.weight = Math.min(Math.max(obj.weight, 0.3), 1.5);
+    // Spinning parts (rotors, propellers, fans): hub point, radius, blade count.
+    const rot = (Array.isArray(obj.rotors) ? obj.rotors : []).filter((r) => r && Array.isArray(r.hub) && r.hub.length === 2 && r.hub.every(num) && num(r.r) && r.r > 2 && r.r < 900)
+      .slice(0, 4).map((r) => ({ hub: r.hub.map((v) => Math.round(v * 10) / 10), r: Math.round(r.r * 10) / 10, blades: Math.min(Math.max(Math.round(num(r.blades) ? r.blades : 2), 2), 6), ...(r.reverse ? { reverse: true } : {}) }));
+    if (rot.length) out.rotors = rot;
     return out;
   }
 
