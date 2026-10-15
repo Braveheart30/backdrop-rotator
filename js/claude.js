@@ -148,17 +148,20 @@ Reply with ONLY a JSON object, no prose, no code fences:
         const v = validate(x);
         const id = sid || 'c' + stamp + items.length;
         have.add(id);
-        items.push({ ...v, id });
+        const anim = {};
+        if (Sketch.MOTIONS[x.motion]) anim.motion = x.motion;
+        if (Sketch.SPEEDS[x.speed]) anim.speed = x.speed;
+        items.push({ ...v, id, anim });
       } catch (e) { /* skip anything that isn't clean line data */ }
     }
     if (!items.length) return 0;
-    const customs = items.map(({ text, ...c }) => ({ ...c, by: 'claude' }));
+    const customs = items.map(({ text, anim, ...c }) => ({ ...c, by: 'claude' }));
     const newIds = new Set(customs.map((c) => c.id));
     await BR.saveSettings({ customSketches: [...(s.customSketches || []).filter((c) => !newIds.has(c.id)), ...customs].slice(-60) });
     const ids = await BR.addRecords(items.map((it, i) => ({ name: it.name, source: 'sketch', added: Date.now() + i,
-      sketch: { subject: it.id, custom: customs[i], text: it.text } })));
+      sketch: { subject: it.id, custom: customs[i], text: it.text, ...it.anim } })));
     await Bridge.call('storage.set', { studioSeen: [...studioSeen, ...items.map((it) => it.id)].slice(-500) });
-    if (ids && ids.length) await BR.saveSettings({ currentId: ids[ids.length - 1], lastChange: Date.now() });
+    if (ids && ids.length) await BR.saveSettings({ currentId: ids[ids.length - 1], lastChange: Date.now(), editStamp: Date.now() });
     return items.length;
   }
   let draining = null;

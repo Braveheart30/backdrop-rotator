@@ -1,6 +1,13 @@
 {
-  "latest": "3.6.0",
+  "latest": "3.6.1",
   "versions": [
+    {
+      "version": "3.6.1",
+      "date": "2026-10-15",
+      "notes": [
+        "Sketches you make in Sketch Studio keep the animation you picked and show up on open tabs right away"
+      ]
+    },
     {
       "version": "3.6.0",
       "date": "2026-10-15",
