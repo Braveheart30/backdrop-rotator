@@ -1,4 +1,5 @@
-// "Sketch anything with Claude": asks Claude to draw a subject as a few clean vector lines.
+// "Sketch anything with Claude": asks Claude to draw a subject as a few clean vector lines,
+// always in the app's single minimal style (the app applies the colors and glow, so it can't go off theme).
 // Uses the user's own Anthropic API key. The reply is strictly checked before anything is drawn.
 const ClaudeSketch = (() => {
   const API = 'https://api.anthropic.com/v1/messages';
@@ -11,15 +12,18 @@ const ClaudeSketch = (() => {
 
   const SYSTEM = `You draw minimalist line-art icons for a calm desktop wallpaper, in the spirit of Apple's simple product line drawings.
 
-Draw the subject the user names as a recognizable silhouette made of a FEW clean strokes:
+The user describes what they want, possibly with extra wishes (words to show, a mood, a detail to include).
+Draw the main subject as a recognizable silhouette made of a FEW clean, single-weight strokes:
 - Use the most recognizable view (usually side profile for vehicles, ships and animals; front or 3/4 for buildings).
 - 3 to 10 strokes total. Capture the essential shape only: outline plus at most a few defining details. No shading, hatching, texture, people, text, letters, numbers, logos, flags or brand marks. If the subject is a brand or franchise, draw the generic object it is (e.g. "Disney cruise" -> a classic cruise ship), never its logo or characters.
 - Coordinates: a canvas 600 wide and between 160 and 280 tall. Keep everything inside it with a little margin. Center the subject.
 - Path data may only use the commands M L H V C S Q T A Z (absolute, uppercase) with plain numbers. Keep each path under 1500 characters.
 - Optionally add 1 or 2 faint ground/horizon/water lines (these may extend from x=-200 to x=800).
+- Never draw letters with strokes. If the user asks for words, a motto, a name or a caption, put that text (24 characters max) in "text" and the app will set it in clean lettering. Otherwise use "".
+- Ignore requests for colors, photos, shading or realism: the app's single minimal style always applies.
 
 Reply with ONLY a JSON object, no prose, no code fences:
-{"name": "Short Title Case name", "size": [600, H], "paths": ["M ..."], "circles": [[cx, cy, r]], "faint": ["M ..."]}`;
+{"name": "Short Title Case name", "text": "", "size": [600, H], "paths": ["M ..."], "circles": [[cx, cy, r]], "faint": ["M ..."]}`;
 
   const num = (x) => typeof x === 'number' && isFinite(x);
   const PATH_OK = /^[MLHVCSQTAZ0-9.,\s-]+$/;
@@ -39,7 +43,8 @@ Reply with ONLY a JSON object, no prose, no code fences:
       .map((c) => c.map((v) => Math.round(v * 10) / 10));
     if (!paths.length && !circles.length) throw new Error('empty');
     const name = String(obj.name || '').replace(/[^\p{L}\p{N} '&-]/gu, '').trim().slice(0, 40) || 'Sketch';
-    return { name, size: [w, h], paths, circles, faint };
+    const text = Sketch.cleanText(obj.text);
+    return { name, text, size: [w, h], paths, circles, faint };
   }
 
   function parseReply(text) {
@@ -56,7 +61,7 @@ Reply with ONLY a JSON object, no prose, no code fences:
   }
 
   async function draw(subject) {
-    subject = String(subject || '').trim().slice(0, 120);
+    subject = String(subject || '').trim().slice(0, 200);
     if (!subject) throw new Error('Type something for Claude to sketch first.');
     const info = await Bridge.call('info').catch(() => ({}));
     if (!shellOk(info.shellVersion)) {
@@ -81,7 +86,7 @@ Reply with ONLY a JSON object, no prose, no code fences:
         },
         body: JSON.stringify({
           model, max_tokens: s.eco ? 1500 : 2500, system: SYSTEM,
-          messages: [{ role: 'user', content: `Sketch: ${subject}${extra || ''}` }]
+          messages: [{ role: 'user', content: `Sketch request: ${subject}${extra || ''}` }]
         }),
         responseType: 'json',
         timeout: 120000

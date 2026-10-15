@@ -1,6 +1,18 @@
 {
-  "latest": "2.4.2",
+  "latest": "3.0.0",
   "versions": [
+    {
+      "version": "3.0.0",
+      "date": "2026-10-14",
+      "notes": [
+        "Sketch-only: every background is a minimal line drawing in one shared look; photo search, web downloads and AI image generators are removed",
+        "Surprise me: new mountain ranges, ocean waves, skylines, constellations and planets made on your computer",
+        "Ask Claude in your own words, including words to show (e.g. a lighthouse with the words STAY STRONG)",
+        "Look: neon glow in 6 colors, white on black, or black on white; word above or below; draw-in animation on/off",
+        "Clock: corner, centered at top, large in the middle, or hidden; 24-hour, date and seconds options",
+        "Library: change any sketch's word; old photos from earlier versions can be deleted"
+      ]
+    },
     {
       "version": "2.4.2",
       "date": "2026-10-14",

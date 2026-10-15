@@ -226,3 +226,40 @@ figure .sk-thumb svg { display: block; width: 100%; height: 100%; }
 .sk-tile:hover .rm, .sk-tile .rm:focus-visible { opacity: 1; }
 
 .status:empty, .note:empty { min-height: 0; margin: 0; }
+
+/* ---- 3.0: sketch-only layout ---- */
+.sub { margin: 20px 0 8px; font-size: 15px; font-weight: 650; }
+.sub .opt, .field .opt { font-weight: 400; color: var(--muted); font-size: 13px; }
+.text-in {
+  width: min(360px, 100%); font: inherit; color: var(--text); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px;
+}
+.text-in:focus, .pv-word input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.gen-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.preview { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.pv-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+.pv-row .ai-actions { margin-top: 0; }
+.pv-word { display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 600; }
+.pv-word input { font: inherit; font-weight: 400; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; width: 240px; }
+.look-grid { display: grid; grid-template-columns: 1fr 300px; gap: 20px; align-items: start; }
+.look-pv { margin-top: 0; }
+@media (max-width: 720px) { .look-grid { grid-template-columns: 1fr; } }
+.swatches { display: flex; gap: 8px; }
+.swatch {
+  width: 26px; height: 26px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; padding: 0;
+  box-shadow: 0 0 0 1px var(--line) inset;
+}
+.swatch[aria-checked="true"] { border-color: var(--text); }
+.legacy {
+  margin-bottom: 12px; padding: 10px 14px; border-radius: 10px; font-size: 14px; border: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+}
+#grid figure .edit {
+  position: absolute; top: 6px; left: 6px; width: 26px; height: 26px; border-radius: 50%; border: 0;
+  background: rgba(0,0,0,.6); color: #fff; font-size: 13px; cursor: pointer; opacity: 0; transition: opacity .15s;
+}
+#grid figure:hover .edit, #grid figure .edit:focus-visible { opacity: 1; }
+#grid figure .word {
+  position: absolute; right: 6px; bottom: 6px; max-width: 70%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: 10.5px; font-weight: 600; letter-spacing: .08em; padding: 2px 7px; border-radius: 999px; background: rgba(0,0,0,.55); color: #fff;
+}
