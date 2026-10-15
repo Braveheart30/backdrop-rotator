@@ -7,7 +7,7 @@ else (() => {
   let settings = { ...BR.DEFAULTS };
 
   const announce = () => { if (!announced) { announced = true; Bridge.ready(); } };
-  const lookKey = (s) => [s.sketchStyle, s.accent, s.textPos, s.animate].join('|');
+  const lookKey = (s) => [s.sketchStyle, s.accent, s.textPos, s.animate, s.motion, s.eco].join('|');
 
   // Crossfade to a sketch.
   async function show(id, force = false) {
@@ -69,7 +69,7 @@ else (() => {
     if ('studioInbox' in c) { ClaudeSketch.drainInbox().catch(() => 0); return; }
     settings = await BR.getSettings();
     applyUI(settings);
-    if (['sketchStyle', 'accent', 'textPos', 'animate'].some((k) => k in c) && settings.currentId != null) {
+    if (['sketchStyle', 'accent', 'textPos', 'animate', 'motion', 'eco'].some((k) => k in c) && settings.currentId != null) {
       await show(settings.currentId, true);
     }
     if ('mode' in c || 'intervalMin' in c) schedule();

@@ -1,6 +1,13 @@
 {
-  "latest": "3.4.6",
+  "latest": "3.5.0",
   "versions": [
+    {
+      "version": "3.5.0",
+      "date": "2026-10-15",
+      "notes": [
+        "Motion: backgrounds keep moving after they draw in (spinning rotors, breathing glow, gentle float, light sweep, starfield)"
+      ]
+    },
     {
       "version": "3.4.6",
       "date": "2026-10-15",

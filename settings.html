@@ -107,6 +107,10 @@
           </select>
         </div>
         <div class="row"><label for="animate">Draw-in animation</label><input id="animate" type="checkbox" class="switch"></div>
+        <div class="row">
+          <label for="motion">Motion <span class="opt" id="motionNote"></span></label>
+          <select id="motion"></select>
+        </div>
       </div>
       <div id="lookPreview" class="cl-canvas look-pv"></div>
     </div>
@@ -169,6 +173,7 @@
     <ul class="eco-list">
       <li><strong>Lighter AI:</strong> Claude drawings always use Haiku, the smallest, most efficient model.</li>
       <li><strong>Fewer AI requests:</strong> at most 5 Claude drawings per day. <span id="aiCount"></span></li>
+      <li><strong>No motion:</strong> backgrounds stay still after drawing in.</li>
       <li>“Surprise me” and ready-made sketches are made on your computer and aren't limited.</li>
     </ul>
   </section>

@@ -42,6 +42,10 @@ else (() => {
       const o = el('option', null, label); o.value = v; return o;
     }));
     $('#claudeModel').value = s.claudeModel || 'claude-sonnet-5-5';
+    $('#motion').replaceChildren(...Object.entries(Sketch.MOTIONS).map(([v, label]) => {
+      const o = el('option', null, label); o.value = v; return o;
+    }));
+    $('#motion').value = s.motion || 'auto';
     renderSwatches();
     updateEco();
   }
@@ -63,8 +67,11 @@ else (() => {
     }
     $('#accentRow').hidden = settings.sketchStyle !== 'neon';
   }
+  // Full-size render (not a thumbnail) so the chosen motion plays in the preview.
   function renderLookPreview() {
-    tile($('#lookPreview'), { subject: 'cybertruck', text: settings.sketchText || 'FOCUS' });
+    const box = $('#lookPreview');
+    box.style.background = Sketch.background(look());
+    box.innerHTML = Sketch.render({ subject: 'chinook', text: settings.sketchText || 'FOCUS' }, look(), {});
   }
   function renderAllLooks() {
     renderSwatches();
@@ -293,6 +300,7 @@ else (() => {
   $('#sketchStyle').addEventListener('change', async (e) => { await save({ sketchStyle: e.target.value }); renderAllLooks(); });
   $('#textPos').addEventListener('change', async (e) => { await save({ textPos: e.target.value }); renderLookPreview(); renderPreview(); });
   $('#animate').addEventListener('change', (e) => save({ animate: e.target.checked }));
+  $('#motion').addEventListener('change', async (e) => { await save({ motion: e.target.value }); renderLookPreview(); });
   $('#clockStyle').addEventListener('change', (e) => save({ clockStyle: e.target.value }));
   for (const k of ['clock24', 'showDate', 'showSeconds', 'search']) $('#' + k).addEventListener('change', (e) => save({ [k]: e.target.checked }));
   $('#mode').addEventListener('change', (e) => {
@@ -314,6 +322,9 @@ else (() => {
     $('#aiCount').textContent = settings.eco ? `(${n} of ${BR.ECO.aiPerDay} used today)` : '';
     $('#claudeModel').disabled = settings.eco;
     $('#claudeModel').title = settings.eco ? 'Eco mode uses Haiku' : '';
+    $('#motion').disabled = settings.eco;
+    $('#motionNote').textContent = settings.eco ? '(off in Eco mode)' : '';
+    renderLookPreview();
   }
   $('#ecoSw').addEventListener('change', async (e) => { await save({ eco: e.target.checked }); updateEco(); toast(e.target.checked ? 'Eco mode on' : 'Eco mode off'); });
   $('#appStop').addEventListener('click', () => Bridge.call('stop'));

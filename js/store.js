@@ -1,6 +1,6 @@
 // Library, settings and rotation for Backdrop Rotator (sketch-only edition).
 // Nothing here downloads images from the web: every background is a line drawing stored as a few numbers.
-const APP_VERSION = '3.4.6';
+const APP_VERSION = '3.5.0';
 
 const BR = (() => {
   // ---------- Storage (lives in the extension, reached through the bridge) ----------
@@ -26,6 +26,7 @@ const BR = (() => {
     accent: 'blue',        // neon color
     textPos: 'above',      // 'above' | 'below'
     animate: true,         // draw-in animation
+    motion: 'auto',        // ambient motion after drawing (see Sketch.MOTIONS)
     sketchText: '',        // default word for new sketches
     customSketches: [],    // drawings made by Claude or "Surprise me", reusable in the picker
     // New tab
@@ -53,7 +54,7 @@ const BR = (() => {
 
   const getSettings = () => Bridge.call('storage.get', DEFAULTS);
   const saveSettings = (patch) => Bridge.call('storage.set', patch);
-  const look = (s) => ({ style: s.sketchStyle, accent: s.accent, textPos: s.textPos, animate: s.animate });
+  const look = (s) => ({ style: s.sketchStyle, accent: s.accent, textPos: s.textPos, animate: s.animate, motion: s.eco ? 'off' : (s.motion || 'auto') });
 
   function shuffle(a) {
     for (let i = a.length - 1; i > 0; i--) {
