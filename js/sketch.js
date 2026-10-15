@@ -156,9 +156,11 @@ const Sketch = (() => {
     const below = look.textPos === 'below';
     const y = 600 - (h * scale) / 2 + (text ? (below ? -30 : 40) : 0);
     let i = 0;
-    const anim = () => (animate ? ` class="d" style="animation-delay:${(0.15 + 0.35 * i++).toFixed(2)}s"` : '');
+    const count = subj.faint.length + subj.paths.length + subj.circles.length;
+    const step = Math.min(0.35, 3 / Math.max(1, count)); // detailed sketches still finish drawing in ~3-4 s
+    const anim = () => (animate ? ` class="d" style="animation-delay:${(0.15 + step * i++).toFixed(2)}s"` : '');
     const strokes = [
-      ...subj.faint.map((d) => `<path d="${d}" pathLength="1" opacity=".28"${anim()}/>`),
+      ...subj.faint.map((d) => `<path d="${d}" pathLength="1" opacity="${num(subj.weight) ? '.5' : '.28'}"${anim()}/>`),
       ...subj.paths.map((d) => `<path d="${d}" pathLength="1"${anim()}/>`),
       ...subj.circles.map(([cx, cy, r]) => `<circle cx="${cx}" cy="${cy}" r="${r}" pathLength="1"${anim()}/>`)
     ].join('');
@@ -167,7 +169,7 @@ const Sketch = (() => {
       : '';
     const css = animate
       ? `<style>.d{stroke-dasharray:1;stroke-dashoffset:1;animation:draw 1.8s cubic-bezier(.6,.05,.3,1) forwards}
-         .t{opacity:0;animation:fade 1.6s ease forwards;animation-delay:${(0.4 + 0.35 * i).toFixed(2)}s}
+         .t{opacity:0;animation:fade 1.6s ease forwards;animation-delay:${(0.4 + step * i).toFixed(2)}s}
          @keyframes draw{to{stroke-dashoffset:0}}@keyframes fade{to{opacity:1}}
          @media (prefers-reduced-motion: reduce){.d,.t{animation:none;stroke-dashoffset:0;opacity:1}}</style>`
       : '';
@@ -180,7 +182,7 @@ const Sketch = (() => {
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
       <defs>${glow}</defs>${css}
       <g transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(${scale.toFixed(4)})" fill="none" stroke="${st.stroke}"
-         stroke-width="${((thumb ? st.width * 2.6 : st.width) / scale).toFixed(3)}" stroke-linecap="round" stroke-linejoin="round"
+         stroke-width="${((thumb ? st.width * 2.6 : st.width) * (num(subj.weight) ? subj.weight : 1) / scale).toFixed(3)}" stroke-linecap="round" stroke-linejoin="round"
          ${st.glow ? 'filter="url(#g)"' : ''}>${strokes}</g>
       ${word}</svg>`;
   }

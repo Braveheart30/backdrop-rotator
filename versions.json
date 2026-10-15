@@ -1,6 +1,13 @@
 {
-  "latest": "3.3.0",
+  "latest": "3.4.0",
   "versions": [
+    {
+      "version": "3.4.0",
+      "date": "2026-10-15",
+      "notes": [
+        "Detailed photo-traced sketches from Sketch Studio (many more lines, finer strokes, bigger on screen)"
+      ]
+    },
     {
       "version": "3.3.0",
       "date": "2026-10-14",

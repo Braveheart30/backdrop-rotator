@@ -34,17 +34,23 @@ Reply with ONLY a JSON object, no prose, no code fences:
     const size = Array.isArray(obj.size) && obj.size.length === 2 && obj.size.every(num) ? obj.size : [600, 230];
     const w = Math.min(Math.max(size[0], 200), 800), h = Math.min(Math.max(size[1], 120), 400);
     const cleanPaths = (arr, max) => (Array.isArray(arr) ? arr : [])
-      .filter((d) => typeof d === 'string' && d.length > 3 && d.length <= 1500 && PATH_OK.test(d.trim()) && /^\s*M/.test(d))
+      .filter((d) => typeof d === 'string' && d.length > 3 && d.length <= 12000 && PATH_OK.test(d.trim()) && /^\s*M/.test(d))
       .slice(0, max).map((d) => d.trim().replace(/\s+/g, ' '));
-    const paths = cleanPaths(obj.paths, 14);
-    const faint = cleanPaths(obj.faint, 3);
+    // Detailed (photo-traced) sketches carry many more lines; cap the total so the new tab stays fast.
+    let budget = 300000;
+    const within = (arr) => arr.filter((d) => (budget -= d.length) >= 0);
+    const paths = within(cleanPaths(obj.paths, 120));
+    const faint = within(cleanPaths(obj.faint, 120));
     const circles = (Array.isArray(obj.circles) ? obj.circles : [])
-      .filter((c) => Array.isArray(c) && c.length === 3 && c.every(num) && c[2] > 0 && c[2] < 400).slice(0, 8)
+      .filter((c) => Array.isArray(c) && c.length === 3 && c.every(num) && c[2] > 0 && c[2] < 400).slice(0, 40)
       .map((c) => c.map((v) => Math.round(v * 10) / 10));
     if (!paths.length && !circles.length) throw new Error('empty');
     const name = String(obj.name || '').replace(/[^\p{L}\p{N} '&-]/gu, '').trim().slice(0, 40) || 'Sketch';
     const text = Sketch.cleanText(obj.text);
-    return { name, text, size: [w, h], paths, circles, faint };
+    const out = { name, text, size: [w, h], paths, circles, faint };
+    if (num(obj.zoom)) out.zoom = Math.min(Math.max(obj.zoom, 0.5), 2.2);
+    if (num(obj.weight)) out.weight = Math.min(Math.max(obj.weight, 0.3), 1.5);
+    return out;
   }
 
   function parseReply(text) {
