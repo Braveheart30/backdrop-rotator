@@ -1,6 +1,13 @@
 {
-  "latest": "3.4.2",
+  "latest": "3.4.3",
   "versions": [
+    {
+      "version": "3.4.3",
+      "date": "2026-10-15",
+      "notes": [
+        "CH-47 Chinook: much more detail (panels, vents, engines, rotor heads, cockpit, gear)"
+      ]
+    },
     {
       "version": "3.4.2",
       "date": "2026-10-15",
