@@ -66,6 +66,7 @@ else (() => {
 
   // Settings changes show up right away on open tabs.
   Bridge.onStorage(async (c) => {
+    if ('studioInbox' in c) { ClaudeSketch.drainInbox().catch(() => 0); return; }
     settings = await BR.getSettings();
     applyUI(settings);
     if (['sketchStyle', 'accent', 'textPos', 'animate'].some((k) => k in c) && settings.currentId != null) {
@@ -93,5 +94,7 @@ else (() => {
   });
 
   setInterval(tickClock, 1000);
-  refresh().catch((e) => { console.error(e); announce(); });
+  ClaudeSketch.drainInbox().catch(() => 0)
+    .then(() => refresh())
+    .catch((e) => { console.error(e); announce(); });
 })();

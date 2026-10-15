@@ -1,6 +1,13 @@
 {
-  "latest": "3.2.0",
+  "latest": "3.3.0",
   "versions": [
+    {
+      "version": "3.3.0",
+      "date": "2026-10-14",
+      "notes": [
+        "Sketch Studio sync: sketches you keep in Sketch Studio appear here automatically (needs extension 2.3.0)"
+      ]
+    },
     {
       "version": "3.2.0",
       "date": "2026-10-14",

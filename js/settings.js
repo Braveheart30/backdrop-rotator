@@ -212,30 +212,25 @@ else (() => {
   $('#clForm').addEventListener('submit', (e) => { e.preventDefault(); claudeDraw(); });
   const syncKeyBox = () => { $('#clKeyBox').hidden = !(settings.claudeKey || '').trim(); };
 
-  // Paste from Sketch Studio: {"backdropSketches":[...]} (any number), or a single drawing.
+  // Paste from Sketch Studio (backup for when sync is off): {"backdropSketches":[...]} or a single drawing.
+  async function afterImport(n, from) {
+    settings = await BR.getSettings();
+    renderPicker();
+    await renderLibrary();
+    if (n) toast(n === 1 ? `Added 1 sketch from ${from}. Open a new tab to watch it draw in.` : `Added ${n} sketches from ${from}.`);
+  }
   async function importPasted() {
     const raw = $('#clReply').value.trim();
     if (!raw) return;
     let list = null;
     try { const j = JSON.parse(raw); if (j && Array.isArray(j.backdropSketches)) list = j.backdropSketches; } catch (e) {}
-    const items = [];
-    try {
-      if (list) { for (const x of list.slice(0, 60)) { try { items.push({ ...ClaudeSketch.validate(x), prompt: String(x.prompt || '').slice(0, 200) }); } catch (e) {} } }
-      else items.push(ClaudeSketch.fromPaste(raw));
-    } catch (e) { status(e.message, true); return; }
-    if (!items.length) { status("That code didn't contain any drawings. In Sketch Studio, keep a sketch, then click Copy for the app.", true); return; }
-    const stamp = Date.now().toString(36);
-    const saved = items.map((it, i) => ({ id: 'c' + stamp + i, name: it.name, size: it.size, paths: it.paths, circles: it.circles, faint: it.faint, by: 'claude', text: it.text }));
-    await save({ customSketches: [...customs(), ...saved.map(({ text, ...c }) => c)].slice(-60) });
-    const ids = await BR.addRecords(saved.map(({ text, ...c }, i) => ({ name: c.name, source: 'sketch', added: Date.now() + i,
-      sketch: { subject: c.id, custom: c, text: saved[i].text } })));
-    if (ids && ids.length) await save({ currentId: ids[0], lastChange: Date.now() });
+    try { if (!list) list = [ClaudeSketch.fromPaste(raw)]; } catch (e) { status(e.message, true); return; }
+    const n = await ClaudeSketch.importSketches(list);
     $('#clReply').value = '';
-    renderPicker();
-    renderLibrary();
-    status('');
-    toast(saved.length === 1 ? `Added "${saved[0].name}". Open a new tab to watch it draw in.` : `Added ${saved.length} sketches from Sketch Studio.`);
+    status(n ? '' : 'Those sketches are already in your library.');
+    await afterImport(n, 'Sketch Studio');
   }
+  async function syncStudio() { const n = await ClaudeSketch.drainInbox().catch(() => 0); if (n) await afterImport(n, 'Sketch Studio'); }
   $('#clReply').addEventListener('paste', () => setTimeout(importPasted, 0));
   $('#clReply').addEventListener('change', importPasted);
   $('#claudeKey').addEventListener('change', async (e) => { await save({ claudeKey: e.target.value.trim() }); syncKeyBox(); });
@@ -344,9 +339,9 @@ else (() => {
     $('#footer').textContent = `Backdrop Rotator app ${APP_VERSION} · extension ${shell}${usage}`;
   }
 
-  Bridge.onStorage((c) => { if ('currentId' in c) { BR.getSettings().then((s) => { settings = s; renderLibrary(); }); } });
+  Bridge.onStorage((c) => { if ('studioInbox' in c) syncStudio(); if ('currentId' in c) { BR.getSettings().then((s) => { settings = s; renderLibrary(); }); } });
 
   loadSettings()
-    .then(() => { syncKeyBox(); renderLookPreview(); renderPicker(); return Promise.all([renderLibrary(), showSafetyInfo(), updateFooter()]); })
+    .then(async () => { await syncStudio(); syncKeyBox(); renderLookPreview(); renderPicker(); return Promise.all([renderLibrary(), showSafetyInfo(), updateFooter()]); })
     .finally(() => Bridge.ready());
 })();

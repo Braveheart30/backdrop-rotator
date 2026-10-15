@@ -123,5 +123,48 @@ Reply with ONLY a JSON object, no prose, no code fences:
     catch (e) { throw new Error("That isn't Sketch Studio code. In Sketch Studio, click Copy for the app, then paste here."); }
   }
 
-  return { MODELS, draw, validate, shellOk, chatPrompt, fromPaste };
+  // Add sketches (from Sketch Studio sync or a paste) to the library. Each studio sketch is added once,
+  // even if you later delete it here; returns how many were added.
+  async function importSketches(list) {
+    const { studioSeen = [] } = await Bridge.call('storage.get', { studioSeen: [] });
+    const s = await BR.getSettings();
+    const have = new Set([...(s.customSketches || []).map((c) => c.id), ...studioSeen]);
+    const stamp = Date.now().toString(36);
+    const items = [];
+    for (const x of (Array.isArray(list) ? list : []).slice(0, 60)) {
+      const sid = x && typeof x.id === 'string' && /^[a-z0-9]{1,24}$/i.test(x.id) ? x.id : null;
+      if (sid && have.has(sid)) continue;
+      try {
+        const v = validate(x);
+        const id = sid || 'c' + stamp + items.length;
+        have.add(id);
+        items.push({ ...v, id });
+      } catch (e) { /* skip anything that isn't clean line data */ }
+    }
+    if (!items.length) return 0;
+    const customs = items.map(({ text, ...c }) => ({ ...c, by: 'claude' }));
+    const newIds = new Set(customs.map((c) => c.id));
+    await BR.saveSettings({ customSketches: [...(s.customSketches || []).filter((c) => !newIds.has(c.id)), ...customs].slice(-60) });
+    const ids = await BR.addRecords(items.map((it, i) => ({ name: it.name, source: 'sketch', added: Date.now() + i,
+      sketch: { subject: it.id, custom: customs[i], text: it.text } })));
+    await Bridge.call('storage.set', { studioSeen: [...studioSeen, ...items.map((it) => it.id)].slice(-500) });
+    if (ids && ids.length) await BR.saveSettings({ currentId: ids[ids.length - 1], lastChange: Date.now() });
+    return items.length;
+  }
+  let draining = null;
+  function drainInbox() {
+    if (draining) return draining;
+    const run = async () => {
+      const { studioInbox = [] } = await Bridge.call('storage.get', { studioInbox: [] });
+      if (!Array.isArray(studioInbox) || !studioInbox.length) return 0;
+      await Bridge.call('storage.remove', 'studioInbox');
+      return importSketches(studioInbox);
+    };
+    // One page at a time (Settings and new tabs may all be open), so nothing is added twice.
+    draining = (navigator.locks ? navigator.locks.request('backdrop-studio-import', run) : run())
+      .finally(() => { draining = null; });
+    return draining;
+  }
+
+  return { MODELS, draw, validate, shellOk, chatPrompt, fromPaste, importSketches, drainInbox };
 })();
