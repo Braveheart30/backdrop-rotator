@@ -1,6 +1,13 @@
 {
-  "latest": "3.4.1",
+  "latest": "3.4.2",
   "versions": [
+    {
+      "version": "3.4.2",
+      "date": "2026-10-15",
+      "notes": [
+        "CH-47 Chinook redrawn from a real side-view reference"
+      ]
+    },
     {
       "version": "3.4.1",
       "date": "2026-10-15",
