@@ -1,6 +1,13 @@
 {
-  "latest": "3.4.4",
+  "latest": "3.4.5",
   "versions": [
+    {
+      "version": "3.4.5",
+      "date": "2026-10-15",
+      "notes": [
+        "CH-47 Chinook traced from a real U.S. Army photo"
+      ]
+    },
     {
       "version": "3.4.4",
       "date": "2026-10-15",
