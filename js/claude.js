@@ -64,9 +64,9 @@ Reply with ONLY a JSON object, no prose, no code fences:
     subject = String(subject || '').trim().slice(0, 200);
     if (!subject) throw new Error('Type something for Claude to sketch first.');
     const info = await Bridge.call('info').catch(() => ({}));
-    if (!shellOk(info.shellVersion)) {
-      throw new Error(`Claude sketches need Backdrop Rotator extension ${MIN_SHELL.join('.')} or newer, and Edge is running extension ${info.shellVersion || 'unknown'}. (The app itself is ${APP_VERSION}; the extension is the part installed in Edge.) Extract the new zip into the folder shown under "Loaded from" in edge://extensions, then click Reload.`);
-    }
+    // Older extensions (before 2.2.0) have no separate Claude switch; their general
+    // web-access switch covers Claude instead, and the emergency stop still works.
+    const oldShell = !shellOk(info.shellVersion);
     const s = await BR.getSettings();
     if (!s.claudeKey) throw new Error('Add your Anthropic API key under "Claude settings" first.');
     const today = new Date().toDateString();
@@ -103,6 +103,7 @@ Reply with ONLY a JSON object, no prose, no code fences:
     let result;
     try { result = await ask(); }
     catch (e) {
+      if (oldShell && /Blocked/.test(e.message)) throw new Error(e.message + ' (On this version of the extension, that switch also controls Claude.)');
       if (/^(Claude|Anthropic)/.test(e.message) || /Blocked|stopped/.test(e.message)) throw e;
       result = await ask('\n\n(Your last reply could not be read. Reply with only the JSON object.)').catch(() => {
         throw new Error("Claude's drawing didn't come out right. Try again, or describe the subject a little differently.");
