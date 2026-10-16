@@ -179,7 +179,7 @@ const PhotoTrace = (() => {
     let wall = new Uint8Array(N);
     for (let i = 0; i < N; i++) wall[i] = mag[i] >= Tg ? 1 : 0;
     wall = morph(wall, W, H, 1, true);
-    const pass = (j) => !wall[j] || (bgDist(j) < Tc && mag[j] < Tg * 2);
+    const pass = (j) => !wall[j] || (bgDist(j) < Tc * 0.5 && mag[j] < Tg * 1.3);
     const bg = new Uint8Array(N), q = new Int32Array(N); let qh = 0, qt = 0;
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (!inBox(x, y)) bg[y * W + x] = 1;
     // Seeds: the margin between Claude's box and the padding (Claude puts the box outside the subject).
