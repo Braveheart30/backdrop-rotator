@@ -145,7 +145,7 @@ const PhotoTrace = (() => {
 
   // loc: { box: [x, y, w, h], erase: [[x, y, w, h]], rotors: [{hub, r}], kind: 'photo' | 'drawing' } in drawing units.
   // level: 'clean' (outline + the strongest details) or 'detailed' (many more real edges).
-  async function trace(src, loc, level = 'clean') {
+  async function trace(src, loc, level = 'clean', opts = {}) {
     const img = typeof src === 'string' ? await loadImg(src) : src;
     const W = 1200, f = W / 600, H = clamp(Math.round(W * img.naturalHeight / img.naturalWidth), 60, 1600), N = W * H;
     const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
@@ -342,10 +342,11 @@ const PhotoTrace = (() => {
     const r1 = (v) => String(Math.round(v / f * 10) / 10);
     const toL = (pts, closed) => 'M' + pts.map(([x, y]) => r1(x) + ' ' + r1(y)).join('L') + (closed ? 'Z' : '');
     // Smooth curves through the points (Catmull-Rom as cubic Béziers), keeping sharp corners sharp.
-    const toD = (pts, closed) => {
+    const toD = (pts, closed, straight = 0) => {
       const n = pts.length; if (n < 3) return toL(pts, closed);
+      const segLen = (i) => { const a = pts[(i + n) % n], b = pts[(i + 1 + n) % n]; return Math.hypot(b[0] - a[0], b[1] - a[1]); };
       const P = (i) => closed ? pts[(i + n) % n] : pts[Math.max(0, Math.min(n - 1, i))];
-      const corner = (i) => { if (!closed && (i === 0 || i === n - 1)) return true; const a = P(i - 1), b = P(i), c = P(i + 1);
+      const corner = (i) => { if (!closed && (i === 0 || i === n - 1)) return true; if (straight && (segLen(i - 1) > straight || segLen(i) > straight)) return true; const a = P(i - 1), b = P(i), c = P(i + 1);
         const v1 = [b[0] - a[0], b[1] - a[1]], v2 = [c[0] - b[0], c[1] - b[1]], l = Math.hypot(...v1) * Math.hypot(...v2) || 1;
         return (v1[0] * v2[0] + v1[1] * v2[1]) / l < 0.55; };
       let d = 'M' + r1(pts[0][0]) + ' ' + r1(pts[0][1]);
@@ -364,7 +365,17 @@ const PhotoTrace = (() => {
     for (const lp of contours(fg, W, H).filter((l) => l.length >= 24).sort((p, q2) => q2.length - p.length)) {
       const clean = level !== 'detailed';
       const sm = clean ? smooth(smooth(smooth(lp, true, 4), true, 3), true, 2) : smooth(smooth(lp, true, 3), true, 2);
-      outline.push(toD(rdp(sm.concat([sm[0]]), tol(sm, clean ? 2.2 : 1.0)).slice(0, -1), true));
+      let v = rdp(sm.concat([sm[0]]), tol(sm, clean ? 2.6 : 1.0)).slice(0, -1);
+      if (clean) {
+        // Drafted look: long edges that are nearly level or upright become exactly level / upright.
+        for (let pass = 0; pass < 2; pass++) for (let i = 0; i < v.length; i++) {
+          const a = v[i], b = v[(i + 1) % v.length], dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy);
+          if (L < 0.035 * W) continue;
+          if (Math.abs(dy) / L < 0.06) { const m = (a[1] + b[1]) / 2; v[i] = [a[0], m]; v[(i + 1) % v.length] = [b[0], m]; }
+          else if (Math.abs(dx) / L < 0.06) { const m = (a[0] + b[0]) / 2; v[i] = [m, a[1]]; v[(i + 1) % v.length] = [m, b[1]]; }
+        }
+      }
+      outline.push(toD(v, true, clean ? 0.05 * W : 0));
     }
 
     // Details inside the subject.
@@ -401,12 +412,70 @@ const PhotoTrace = (() => {
       }).map((pts) => { let s = 0; for (const [x, y] of pts) s += mag[y * W + x]; return { pts, str: (s / pts.length) * Math.sqrt(pts.length) }; });
     }
     detail.sort((p, q2) => q2.str - p.str);
-    if (level !== 'detailed') detail = detail.slice(0, 45);
-    let budget = level === 'detailed' ? 200000 : 60000;
-    const segs = [];
-    for (const d of detail) { const sp = smooth(d.pts, false, level === 'detailed' ? 1 : 3); const s = (level === 'detailed' ? toL : toD)(rdp(sp, tol(sp, level === 'detailed' ? 1.2 : 2.4)), false); if ((budget -= s.length) < 0) break; segs.push(s); }
-    const cut = Math.max(1, Math.round(segs.length * (level === 'detailed' ? 0.35 : 0.6)));
-    return { ok: true, frac, dbg: {}, H: Math.round(H / f), outline: pack(outline), strong: pack(segs.slice(0, cut)), weak: pack(segs.slice(cut)) };
+    detail = detail.slice(0, opts.pool ? 220 : level === 'detailed' ? 400 : 90);
+
+    // ---------- Smart cleanup: how an illustrator would redraw the real lines ----------
+    // 1. Drop double edges (both sides of one thin feature) and lines hugging the outline.
+    const occ = new Uint8Array(N);
+    const stamp = (pts, r) => { for (const [x, y] of pts) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { const xx = Math.round(x) + dx, yy = Math.round(y) + dy; if (xx >= 0 && yy >= 0 && xx < W && yy < H) occ[yy * W + xx] = 1; } };
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; if (fg[i] && (x === 0 || !fg[i - 1] || !fg[i + 1] || !fg[i - W] || !fg[i + W])) stamp([[x, y]], 3); }
+    let lines = [];
+    for (const d of detail) {
+      let cov = 0; for (const [x, y] of d.pts) if (occ[y * W + x]) cov++;
+      if (cov > 0.7 * d.pts.length) continue;
+      lines.push(d); stamp(d.pts, 3);
+    }
+    // 2. Join broken pieces whose ends meet and point the same way.
+    const dirAt = (pts, end) => { const n = pts.length, k = Math.min(8, n - 1); const a = end ? pts[n - 1 - k] : pts[k], b = end ? pts[n - 1] : pts[0]; const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [(b[0] - a[0]) / l, (b[1] - a[1]) / l]; };
+    for (let pass = 0; pass < 3; pass++) {
+      let joined = false;
+      for (let i = 0; i < lines.length && !joined; i++) for (let j = 0; j < lines.length && !joined; j++) {
+        if (i === j) continue;
+        const A = lines[i].pts, B = lines[j].pts;
+        for (const [ea, eb] of [[true, false], [true, true], [false, false], [false, true]]) {
+          const pa = ea ? A[A.length - 1] : A[0], pb = eb ? B[B.length - 1] : B[0];
+          const gap = Math.hypot(pa[0] - pb[0], pa[1] - pb[1]); if (gap > 9) continue;
+          const da = dirAt(A, ea), db = dirAt(B, eb);
+          if (da[0] * -db[0] + da[1] * -db[1] < 0.8) continue;   // must continue in the same direction
+          const a2 = ea ? A : A.slice().reverse(), b2 = eb ? B.slice().reverse() : B;
+          lines[i] = { pts: a2.concat(b2), str: lines[i].str + lines[j].str }; lines.splice(j, 1); joined = true; break;
+        }
+      }
+      if (!joined) break;
+    }
+    // 3. Fit clean shapes: straight lines stay straight, round windows become true ellipses, the rest smooth curves.
+    const fitShape = (pts) => {
+      const n = pts.length; let L = 0; for (let i = 1; i < n; i++) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+      let mx = 0, my = 0; for (const [x, y] of pts) { mx += x; my += y; } mx /= n; my /= n;
+      let sxx = 0, syy = 0, sxy = 0; for (const [x, y] of pts) { sxx += (x - mx) ** 2; syy += (y - my) ** 2; sxy += (x - mx) * (y - my); } sxx /= n; syy /= n; sxy /= n;
+      const tr = sxx + syy, det = sxx * syy - sxy * sxy, l1 = tr / 2 + Math.sqrt(Math.max(0, tr * tr / 4 - det)), l2 = tr / 2 - Math.sqrt(Math.max(0, tr * tr / 4 - det));
+      const ang = 0.5 * Math.atan2(2 * sxy, sxx - syy), ux = Math.cos(ang), uy = Math.sin(ang);
+      const closed = Math.hypot(pts[0][0] - pts[n - 1][0], pts[0][1] - pts[n - 1][1]) < Math.max(5, 0.08 * L);
+      // Straight line: tiny spread across the main direction.
+      if (!closed && Math.sqrt(Math.max(0, l2)) < Math.max(1.0, 0.012 * L)) {
+        let t0 = Infinity, t1 = -Infinity; for (const [x, y] of pts) { const t = (x - mx) * ux + (y - my) * uy; t0 = Math.min(t0, t); t1 = Math.max(t1, t); }
+        return { kind: 'line', d: toL([[mx + ux * t0, my + uy * t0], [mx + ux * t1, my + uy * t1]], false), L };
+      }
+      // Ellipse: closed and every point near the fitted ellipse.
+      if (closed && n >= 16) {
+        const a = Math.sqrt(2 * l1), b = Math.sqrt(2 * Math.max(l2, 0.01));
+        let err = 0; for (const [x, y] of pts) { const u = ((x - mx) * ux + (y - my) * uy) / a, v = (-(x - mx) * uy + (y - my) * ux) / b; err += Math.abs(Math.hypot(u, v) - 1); }
+        if (err / n < 0.09 && b / a > 0.25) {
+          const deg = Math.round(ang * 180 / Math.PI), ra = r1(a), rb = r1(b), p1 = [mx + ux * a, my + uy * a], p2 = [mx - ux * a, my - uy * a];
+          return { kind: 'ellipse', d: `M${r1(p1[0])} ${r1(p1[1])}A${ra} ${rb} ${deg} 1 0 ${r1(p2[0])} ${r1(p2[1])}A${ra} ${rb} ${deg} 1 0 ${r1(p1[0])} ${r1(p1[1])}Z`, L };
+        }
+      }
+      const sp = smooth(pts, closed, level === 'detailed' ? 1 : 3);
+      return { kind: 'curve', d: toD(rdp(sp, tol(sp, level === 'detailed' ? 1.2 : 2.2)), closed), L };
+    };
+    const cands = lines.map((l, i) => {
+      const sh = fitShape(l.pts), m = l.pts[Math.floor(l.pts.length / 2)];
+      return { id: i + 1, d: sh.d, kind: sh.kind, len: Math.round(sh.L / f), mid: [Math.round(m[0] / f), Math.round(m[1] / f)], str: l.str };
+    });
+    const keepN = level === 'detailed' ? cands.length : Math.min(cands.length, 45);
+    const auto = cands.slice(0, keepN);
+    const cut = Math.max(1, Math.round(auto.length * (level === 'detailed' ? 0.35 : 0.6)));
+    return { ok: true, frac, dbg: {}, H: Math.round(H / f), outline: pack(outline), strong: pack(auto.slice(0, cut).map((c) => c.d)), weak: pack(auto.slice(cut).map((c) => c.d)), cands };
   }
 
   return { trace };
