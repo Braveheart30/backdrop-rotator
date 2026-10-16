@@ -236,7 +236,7 @@ const PhotoTrace = (() => {
     let area = 0;
     for (let i = 0; i < N; i++) { fg[i] = fg[i] && keep[lab[i]] ? 1 : 0; area += fg[i]; }
     const frac = area / ((x1 - x0) * (y1 - y0));
-    if (frac < 0.04 || frac > 0.96) return { ok: false, frac };
+    if (frac < 0.04 || frac > 0.96) return { ok: false, frac, dbg: { Tc, Tg } };
 
     // Outline: the subject's boundary, smoothed lightly.
     const edgeOut = new Uint8Array(N);
@@ -287,7 +287,7 @@ const PhotoTrace = (() => {
     const segs = [];
     for (const d of detail) { const s = toD(rdp(smooth(d.pts, false, 1), level === 'detailed' ? 1.2 : 1.4), false); if ((budget -= s.length) < 0) break; segs.push(s); }
     const cut = Math.max(1, Math.round(segs.length * (level === 'detailed' ? 0.35 : 0.5)));
-    return { ok: true, frac, H: Math.round(H / f), outline: pack(outline), strong: pack(segs.slice(0, cut)), weak: pack(segs.slice(cut)) };
+    return { ok: true, frac, dbg: { Tc, Tg }, H: Math.round(H / f), outline: pack(outline), strong: pack(segs.slice(0, cut)), weak: pack(segs.slice(cut)) };
   }
 
   return { trace };
