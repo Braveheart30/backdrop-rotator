@@ -160,46 +160,35 @@ const PhotoTrace = (() => {
     const x1 = clamp(Math.round(box[0] + box[2] + pad), x0 + 1, W), y1 = clamp(Math.round(box[1] + box[3] + pad), y0 + 1, H);
     const inBox = (x, y) => x >= x0 && x < x1 && y >= y0 && y < y1;
 
-    // Background colours: a band just outside the box (or the image border if the box fills the image).
-    const band = Math.round(0.03 * W), samp = [], ringDist = [];
-    const step = Math.max(1, Math.round(Math.sqrt(((x1 - x0 + 2 * band) * (y1 - y0 + 2 * band)) / 6000)));
-    for (let y = Math.max(0, y0 - band); y < Math.min(H, y1 + band); y += step) for (let x = Math.max(0, x0 - band); x < Math.min(W, x1 + band); x += step) {
-      if (x >= box[0] && x < box[0] + box[2] && y >= box[1] && y < box[1] + box[3]) continue; const i = (y * W + x) * 4; samp.push(px[i], px[i + 1], px[i + 2]);
-    }
-    if (samp.length < 150) for (let x = 0; x < W; x += 3) for (const y of [0, 1, H - 2, H - 1]) { const i = (y * W + x) * 4; samp.push(px[i], px[i + 1], px[i + 2]); }
-    const C = kmeans(samp, 6);
-    const bgDist = (i) => { let bd = Infinity; for (const c of C) { const d = (px[i * 4] - c[0]) ** 2 + (px[i * 4 + 1] - c[1]) ** 2 + (px[i * 4 + 2] - c[2]) ** 2; if (d < bd) bd = d; } return Math.sqrt(bd); };
-    for (let i = 0; i < samp.length; i += 3) { let bd = Infinity; for (const c of C) { const d = (samp[i] - c[0]) ** 2 + (samp[i + 1] - c[1]) ** 2 + (samp[i + 2] - c[2]) ** 2; if (d < bd) bd = d; } ringDist.push(Math.sqrt(bd)); }
-    const boxMag = [];
-    for (let y = y0; y < y1; y += 2) for (let x = x0; x < x1; x += 2) boxMag.push(mag[y * W + x]);
-    const Tc = clamp(pct(ringDist, 0.95) * 1.6, 16, 48), Tg = Math.max(24, pct(boxMag, drawing ? 0.97 : 0.86));
-
-    // Flood the background in from the box edges (Claude's box is outside the subject, except where the
-    // photo itself cuts the subject off); walls are strong edges, but background-coloured pixels always pass.
-    let wall = new Uint8Array(N);
-    for (let i = 0; i < N; i++) wall[i] = mag[i] >= Tg ? 1 : 0;
-    wall = morph(wall, W, H, 1, true);
-    const pass = (j) => !wall[j] || (bgDist(j) < Tc * 0.5 && mag[j] < Tg * 1.3);
-    const bg = new Uint8Array(N), q = new Int32Array(N); let qh = 0, qt = 0;
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (!inBox(x, y)) bg[y * W + x] = 1;
-    // Seeds: the margin between Claude's box and the padding (Claude puts the box outside the subject).
+    // Watershed: background grows in from the margin between Claude's box and the padding, the subject grows out
+    // from the points Claude marked on it, both in order of edge strength, so they meet on the real edges.
+    const lab0 = new Uint8Array(N), LV = 1024, buckets = Array.from({ length: LV }, () => []);
+    const lev = (i) => Math.min(LV - 1, Math.round(mag[i]));
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (!inBox(x, y)) lab0[y * W + x] = 1;
     const bx0 = Math.round(box[0]), by0 = Math.round(box[1]), bx1 = Math.round(box[0] + box[2]), by1 = Math.round(box[1] + box[3]);
     const inner0 = (x, y) => x >= bx0 && x < bx1 && y >= by0 && y < by1;
-    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
-      const i = y * W + x; if (!inner0(x, y) && !bg[i] && pass(i)) { bg[i] = 1; q[qt++] = i; }
-    }
-    if (!qt) {
-      const seed = (x, y) => { const i = y * W + x; if (!bg[i] && pass(i)) { bg[i] = 1; q[qt++] = i; } };
-      for (let x = 0; x < W; x++) { seed(x, 0); seed(x, H - 1); }
-      for (let y = 0; y < H; y++) { seed(0, y); seed(W - 1, y); }
-    }
-    while (qh < qt) {
-      const i = q[qh++], x = i % W, y = (i - x) / W;
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const xx = x + dx, yy = y + dy; if (!inBox(xx, yy)) continue;
-        const j = yy * W + xx; if (!bg[j] && pass(j)) { bg[j] = 1; q[qt++] = j; }
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) if (!inner0(x, y)) { const i = y * W + x; lab0[i] = 1; buckets[lev(i)].push(i); }
+    const pts = (Array.isArray(loc.inside) && loc.inside.length ? loc.inside : [[box[0] / f + box[2] / f / 2, box[1] / f + box[3] / f / 2]]).slice(0, 30);
+    for (const [ux, uy] of pts) {
+      const cx = Math.round(ux * f), cy = Math.round(uy * f);
+      for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+        const x = cx + dx, y = cy + dy; if (dx * dx + dy * dy > 16 || !inBox(x, y)) continue;
+        const i = y * W + x; if (!lab0[i]) { lab0[i] = 2; buckets[lev(i)].push(i); }
       }
     }
+    for (let L = 0; L < LV; L++) {
+      const bk = buckets[L];
+      while (bk.length) {
+        const i = bk.pop(), x = i % W, y = (i - x) / W, me = lab0[i];
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const xx = x + dx, yy = y + dy; if (!inBox(xx, yy)) continue;
+          const j = yy * W + xx; if (lab0[j]) continue;
+          lab0[j] = me; const l = Math.max(L, lev(j)); buckets[l].push(j);
+        }
+      }
+    }
+    const bg = new Uint8Array(N), q = new Int32Array(N); let qh = 0, qt = 0;
+    for (let i = 0; i < N; i++) bg[i] = lab0[i] === 2 ? 0 : 1;
     let fg = new Uint8Array(N);
     for (let i = 0; i < N; i++) fg[i] = bg[i] ? 0 : 1;
     for (const [ex, ey, ew, eh] of loc.erase || []) {
@@ -238,7 +227,7 @@ const PhotoTrace = (() => {
     let area = 0;
     for (let i = 0; i < N; i++) { fg[i] = fg[i] && keep[lab[i]] ? 1 : 0; area += fg[i]; }
     const frac = area / ((x1 - x0) * (y1 - y0));
-    if (frac < 0.04 || frac > 0.96) return { ok: false, frac, dbg: { Tc, Tg } };
+    if (frac < 0.04 || frac > 0.96) return { ok: false, frac, dbg: {} };
 
     // Outline: the subject's boundary, smoothed lightly.
     const edgeOut = new Uint8Array(N);
@@ -289,7 +278,7 @@ const PhotoTrace = (() => {
     const segs = [];
     for (const d of detail) { const s = toD(rdp(smooth(d.pts, false, 1), level === 'detailed' ? 1.2 : 1.4), false); if ((budget -= s.length) < 0) break; segs.push(s); }
     const cut = Math.max(1, Math.round(segs.length * (level === 'detailed' ? 0.35 : 0.5)));
-    return { ok: true, frac, dbg: { Tc, Tg }, H: Math.round(H / f), outline: pack(outline), strong: pack(segs.slice(0, cut)), weak: pack(segs.slice(cut)) };
+    return { ok: true, frac, dbg: {}, H: Math.round(H / f), outline: pack(outline), strong: pack(segs.slice(0, cut)), weak: pack(segs.slice(cut)) };
   }
 
   return { trace };
