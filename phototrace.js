@@ -164,7 +164,7 @@ const PhotoTrace = (() => {
     const band = Math.round(0.03 * W), samp = [], ringDist = [];
     const step = Math.max(1, Math.round(Math.sqrt(((x1 - x0 + 2 * band) * (y1 - y0 + 2 * band)) / 6000)));
     for (let y = Math.max(0, y0 - band); y < Math.min(H, y1 + band); y += step) for (let x = Math.max(0, x0 - band); x < Math.min(W, x1 + band); x += step) {
-      if (inBox(x, y)) continue; const i = (y * W + x) * 4; samp.push(px[i], px[i + 1], px[i + 2]);
+      if (x >= box[0] && x < box[0] + box[2] && y >= box[1] && y < box[1] + box[3]) continue; const i = (y * W + x) * 4; samp.push(px[i], px[i + 1], px[i + 2]);
     }
     if (samp.length < 150) for (let x = 0; x < W; x += 3) for (const y of [0, 1, H - 2, H - 1]) { const i = (y * W + x) * 4; samp.push(px[i], px[i + 1], px[i + 2]); }
     const C = kmeans(samp, 6);
@@ -182,12 +182,14 @@ const PhotoTrace = (() => {
     const pass = (j) => !wall[j] || (bgDist(j) < Tc && mag[j] < Tg * 2);
     const bg = new Uint8Array(N), q = new Int32Array(N); let qh = 0, qt = 0;
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (!inBox(x, y)) bg[y * W + x] = 1;
-    const open = { l: box[0] - pad > 0, t: box[1] - pad > 0, r: box[0] + box[2] + pad < W, b: box[1] + box[3] + pad < H };
-    const seed = (x, y) => { const i = y * W + x; if (!bg[i] && pass(i)) { bg[i] = 1; q[qt++] = i; } };
-    if (open.l || open.t || open.r || open.b) {
-      for (let x = x0; x < x1; x++) { if (open.t) seed(x, y0); if (open.b) seed(x, y1 - 1); }
-      for (let y = y0; y < y1; y++) { if (open.l) seed(x0, y); if (open.r) seed(x1 - 1, y); }
-    } else {
+    // Seeds: the margin between Claude's box and the padding (Claude puts the box outside the subject).
+    const bx0 = Math.round(box[0]), by0 = Math.round(box[1]), bx1 = Math.round(box[0] + box[2]), by1 = Math.round(box[1] + box[3]);
+    const inner0 = (x, y) => x >= bx0 && x < bx1 && y >= by0 && y < by1;
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+      const i = y * W + x; if (!inner0(x, y) && !bg[i] && pass(i)) { bg[i] = 1; q[qt++] = i; }
+    }
+    if (!qt) {
+      const seed = (x, y) => { const i = y * W + x; if (!bg[i] && pass(i)) { bg[i] = 1; q[qt++] = i; } };
       for (let x = 0; x < W; x++) { seed(x, 0); seed(x, H - 1); }
       for (let y = 0; y < H; y++) { seed(0, y); seed(W - 1, y); }
     }
