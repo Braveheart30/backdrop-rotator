@@ -23,24 +23,6 @@ const PhotoTrace = (() => {
     return o;
   }
 
-  // Simple k-means on RGB samples.
-  function kmeans(samples, k) {
-    const n = samples.length / 3; if (!n) return [];
-    k = Math.min(k, n);
-    const c = [];
-    for (let j = 0; j < k; j++) { const i = Math.floor((j + 0.5) * n / k); c.push([samples[i * 3], samples[i * 3 + 1], samples[i * 3 + 2]]); }
-    for (let it = 0; it < 10; it++) {
-      const sum = c.map(() => [0, 0, 0, 0]);
-      for (let i = 0; i < n; i++) {
-        let best = 0, bd = Infinity;
-        for (let j = 0; j < k; j++) { const d = (samples[i * 3] - c[j][0]) ** 2 + (samples[i * 3 + 1] - c[j][1]) ** 2 + (samples[i * 3 + 2] - c[j][2]) ** 2; if (d < bd) { bd = d; best = j; } }
-        const s = sum[best]; s[0] += samples[i * 3]; s[1] += samples[i * 3 + 1]; s[2] += samples[i * 3 + 2]; s[3]++;
-      }
-      sum.forEach((s, j) => { if (s[3]) c[j] = [s[0] / s[3], s[1] / s[3], s[2] / s[3]]; });
-    }
-    return c;
-  }
-
   // Zhang-Suen thinning (for line drawings: one centre line per inked stroke).
   function thin(m, W, H) {
     let changed = true;
@@ -176,6 +158,13 @@ const PhotoTrace = (() => {
         const i = y * W + x; if (!lab0[i]) { lab0[i] = 2; buckets[lev(i)].push(i); }
       }
     }
+    for (const [ux, uy] of (Array.isArray(loc.outside) ? loc.outside : []).slice(0, 30)) {
+      const cx = Math.round(ux * f), cy = Math.round(uy * f);
+      for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+        const x = cx + dx, y = cy + dy; if (dx * dx + dy * dy > 9 || !inBox(x, y)) continue;
+        const i = y * W + x; if (!lab0[i]) { lab0[i] = 1; buckets[lev(i)].push(i); }
+      }
+    }
     for (let L = 0; L < LV; L++) {
       const bk = buckets[L];
       while (bk.length) {
@@ -191,9 +180,6 @@ const PhotoTrace = (() => {
     for (let i = 0; i < N; i++) bg[i] = lab0[i] === 2 ? 0 : 1;
     let fg = new Uint8Array(N);
     for (let i = 0; i < N; i++) fg[i] = bg[i] ? 0 : 1;
-    for (const [ex, ey, ew, eh] of loc.erase || []) {
-      for (let y = clamp(Math.round(ey * f), 0, H); y < clamp(Math.round((ey + eh) * f), 0, H); y++) for (let x = clamp(Math.round(ex * f), 0, W); x < clamp(Math.round((ex + ew) * f), 0, W); x++) fg[y * W + x] = 0;
-    }
     fg = morph(morph(fg, W, H, 2, true), W, H, 2, false);   // close small gaps
     fg = morph(morph(fg, W, H, 2, false), W, H, 2, true);   // drop specks and spikes
     // Thin rotor blades are drawn (and animated) by the app, so take them out of the photo outline.
@@ -245,6 +231,10 @@ const PhotoTrace = (() => {
 
     // Details inside the subject.
     const inner = morph(fg, W, H, drawing ? 2 : 3, false);
+    // Lettering, logos and markings Claude boxed are left out of the details (the outline is untouched).
+    for (const [ex, ey, ew, eh] of (loc.erase || []).slice(0, 30)) {
+      for (let y = clamp(Math.round(ey * f), 0, H); y < clamp(Math.round((ey + eh) * f), 0, H); y++) for (let x = clamp(Math.round(ex * f), 0, W); x < clamp(Math.round((ex + ew) * f), 0, W); x++) inner[y * W + x] = 0;
+    }
     let detail;
     if (drawing) {
       const vals = []; for (let i = 0; i < N; i++) if (inner[i]) vals.push(gray[i]);
