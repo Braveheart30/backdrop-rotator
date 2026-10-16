@@ -310,12 +310,31 @@ const PhotoTrace = (() => {
     if (drawing) fg = morph(fg, W, H, 3, false);   // sit the outline on the drawn line, not beside it
     // Outline: the subject's boundary loops, smoothed lightly.
     const r1 = (v) => String(Math.round(v / f * 10) / 10);
-    const toD = (pts, closed) => 'M' + pts.map(([x, y]) => r1(x) + ' ' + r1(y)).join('L') + (closed ? 'Z' : '');
+    const toL = (pts, closed) => 'M' + pts.map(([x, y]) => r1(x) + ' ' + r1(y)).join('L') + (closed ? 'Z' : '');
+    // Smooth curves through the points (Catmull-Rom as cubic Béziers), keeping sharp corners sharp.
+    const toD = (pts, closed) => {
+      const n = pts.length; if (n < 3) return toL(pts, closed);
+      const P = (i) => closed ? pts[(i + n) % n] : pts[Math.max(0, Math.min(n - 1, i))];
+      const corner = (i) => { if (!closed && (i === 0 || i === n - 1)) return true; const a = P(i - 1), b = P(i), c = P(i + 1);
+        const v1 = [b[0] - a[0], b[1] - a[1]], v2 = [c[0] - b[0], c[1] - b[1]], l = Math.hypot(...v1) * Math.hypot(...v2) || 1;
+        return (v1[0] * v2[0] + v1[1] * v2[1]) / l < 0.55; };
+      let d = 'M' + r1(pts[0][0]) + ' ' + r1(pts[0][1]);
+      const last = closed ? n : n - 1;
+      for (let i = 0; i < last; i++) {
+        const p0 = P(i - 1), p1 = P(i), p2 = P(i + 1), p3 = P(i + 2);
+        const c1 = corner(i) ? p1 : [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+        const c2 = corner(i + 1) ? p2 : [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+        d += c1 === p1 && c2 === p2 ? 'L' + r1(p2[0]) + ' ' + r1(p2[1]) : 'C' + [c1, c2, p2].map(([x, y]) => r1(x) + ' ' + r1(y)).join(' ');
+      }
+      return d + (closed ? 'Z' : '');
+    };
+    // Tolerance for simplifying: smaller for small shapes (windows stay round).
+    const tol = (pts, base) => { let L = 0; for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); return Math.max(0.6, Math.min(base, L / 45)); };
     const outline = [];
     for (const lp of contours(fg, W, H).filter((l) => l.length >= 24).sort((p, q2) => q2.length - p.length)) {
       const clean = level !== 'detailed';
       const sm = clean ? smooth(smooth(smooth(lp, true, 4), true, 3), true, 2) : smooth(smooth(lp, true, 3), true, 2);
-      outline.push(toD(rdp(sm.concat([sm[0]]), clean ? 1.8 : 0.9).slice(0, -1), true));
+      outline.push(toD(rdp(sm.concat([sm[0]]), tol(sm, clean ? 2.2 : 1.0)).slice(0, -1), true));
     }
 
     // Details inside the subject.
@@ -355,7 +374,7 @@ const PhotoTrace = (() => {
     if (level !== 'detailed') detail = detail.slice(0, 45);
     let budget = level === 'detailed' ? 200000 : 60000;
     const segs = [];
-    for (const d of detail) { const s = toD(rdp(smooth(d.pts, false, level === 'detailed' ? 1 : 3), level === 'detailed' ? 1.2 : 2.2), false); if ((budget -= s.length) < 0) break; segs.push(s); }
+    for (const d of detail) { const sp = smooth(d.pts, false, level === 'detailed' ? 1 : 3); const s = (level === 'detailed' ? toL : toD)(rdp(sp, tol(sp, level === 'detailed' ? 1.2 : 2.4)), false); if ((budget -= s.length) < 0) break; segs.push(s); }
     const cut = Math.max(1, Math.round(segs.length * (level === 'detailed' ? 0.35 : 0.6)));
     return { ok: true, frac, dbg: {}, H: Math.round(H / f), outline: pack(outline), strong: pack(segs.slice(0, cut)), weak: pack(segs.slice(cut)) };
   }
