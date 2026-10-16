@@ -203,9 +203,28 @@ const PhotoTrace = (() => {
     // from the points Claude marked on it, in order of edge strength, so they meet on the real edges. Colour helps
     // too: each side pays extra to take pixels that look like the other side (faint edges, pale-on-pale).
     const LV = 1024, buckets = Array.from({ length: LV }, () => []);
-    const pts = (Array.isArray(loc.inside) && loc.inside.length ? loc.inside : [[box[0] / f + box[2] / f / 2, box[1] / f + box[3] / f / 2]]).slice(0, 40);
+    const pts = (Array.isArray(loc.inside) && loc.inside.length ? loc.inside : loc.ai ? [] : [[box[0] / f + box[2] / f / 2, box[1] / f + box[3] / f / 2]]).slice(0, 40);
+    // AI cutout (optional, photos only): a 320x320 map of how likely each spot is the subject.
+    // Confident subject = subject seeds; confident background well away from the subject = background seeds;
+    // the band in between is settled by the photo's real edges.
+    let aiCore = null, aiBg = null;
+    if (loc.ai && !drawing && loc.ai.length === 320 * 320) {
+      const A = new Float32Array(N), ai = loc.ai;
+      for (let y = 0; y < H; y++) { const fy = clamp((y + 0.5) * 320 / H - 0.5, 0, 319), y0a = Math.floor(fy), y1a = Math.min(319, y0a + 1), ay = fy - y0a;
+        for (let x = 0; x < W; x++) { const fx = clamp((x + 0.5) * 320 / W - 0.5, 0, 319), x0a = Math.floor(fx), x1a = Math.min(319, x0a + 1), ax = fx - x0a;
+          A[y * W + x] = (ai[y0a * 320 + x0a] * (1 - ax) + ai[y0a * 320 + x1a] * ax) * (1 - ay) + (ai[y1a * 320 + x0a] * (1 - ax) + ai[y1a * 320 + x1a] * ax) * ay; } }
+      let hi = new Uint8Array(N), any = 0;
+      for (let y = by0; y < by1; y++) for (let x = bx0; x < bx1; x++) { const i = y * W + x; if (A[i] > 0.85) { hi[i] = 1; any++; } }
+      if (any > 0.05 * (bx1 - bx0) * (by1 - by0)) {
+        aiCore = morph(hi, W, H, 3, false);
+        const sub = new Uint8Array(N); for (let i = 0; i < N; i++) sub[i] = A[i] > 0.5 ? 1 : 0;
+        const nearSub = morph(sub, W, H, Math.max(6, Math.round(0.012 * W)), true);
+        aiBg = new Uint8Array(N); for (let i = 0; i < N; i++) aiBg[i] = !nearSub[i] && A[i] < 0.05 ? 1 : 0;
+      }
+    }
     // Colour models.
     const fs = [], bs = [];
+    if (aiCore) { for (let i = 0; i < N; i += 37) { if (aiCore[i]) fs.push(px[i * 4], px[i * 4 + 1], px[i * 4 + 2]); else if (aiBg[i] && inBox(i % W, (i - i % W) / W)) bs.push(px[i * 4], px[i * 4 + 1], px[i * 4 + 2]); } }
     for (const [ux, uy] of pts) disk(ux, uy, 6, (i) => fs.push(px[i * 4], px[i * 4 + 1], px[i * 4 + 2]));
     const st2 = Math.max(1, Math.round(Math.sqrt((x1 - x0) * (y1 - y0) / 20000)));
     for (let y = y0; y < y1; y += st2) for (let x = x0; x < x1; x += st2) if (!inner0(x, y)) { const i = (y * W + x) * 4; bs.push(px[i], px[i + 1], px[i + 2]); }
@@ -235,6 +254,11 @@ const PhotoTrace = (() => {
     for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) if (!inner0(x, y)) { const i = y * W + x; lab0[i] = 1; buckets[0].push(i * 2); }
     for (const [ux, uy] of outs) disk(ux, uy, 4, (i) => { if (!lab0[i]) { lab0[i] = 1; buckets[0].push(i * 2); } });
     for (const [ux, uy] of pts) disk(ux, uy, 6, (i) => { if (!lab0[i]) { lab0[i] = 2; buckets[0].push(i * 2 + 1); } });
+    if (aiCore) for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+      const i = y * W + x; if (lab0[i]) continue;
+      if (aiCore[i] && inner0(x, y)) { lab0[i] = 2; buckets[0].push(i * 2 + 1); }
+      else if (aiBg[i]) { lab0[i] = 1; buckets[0].push(i * 2); }
+    }
     // Split the queue by side so ties go to the subject (enclosed regions both sides reach at once).
     const fgB = Array.from({ length: LV }, () => []);
     for (let L = 0; L < LV; L++) { const keep = []; for (const e of buckets[L]) (e & 1 ? fgB[L] : keep).push(e); buckets[L] = keep; }
