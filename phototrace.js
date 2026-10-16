@@ -23,6 +23,24 @@ const PhotoTrace = (() => {
     return o;
   }
 
+  // Simple k-means on RGB samples (flat array r,g,b,...).
+  function kmeans(samples, k) {
+    const n = samples.length / 3; if (!n) return [];
+    k = Math.min(k, n);
+    const c = [];
+    for (let j = 0; j < k; j++) { const i = Math.floor((j + 0.5) * n / k); c.push([samples[i * 3], samples[i * 3 + 1], samples[i * 3 + 2]]); }
+    for (let it = 0; it < 8; it++) {
+      const sum = c.map(() => [0, 0, 0, 0]);
+      for (let i = 0; i < n; i++) {
+        let best = 0, bd = Infinity;
+        for (let j = 0; j < k; j++) { const d = (samples[i * 3] - c[j][0]) ** 2 + (samples[i * 3 + 1] - c[j][1]) ** 2 + (samples[i * 3 + 2] - c[j][2]) ** 2; if (d < bd) { bd = d; best = j; } }
+        const s = sum[best]; s[0] += samples[i * 3]; s[1] += samples[i * 3 + 1]; s[2] += samples[i * 3 + 2]; s[3]++;
+      }
+      sum.forEach((s, j) => { if (s[3]) c[j] = [s[0] / s[3], s[1] / s[3], s[2] / s[3]]; });
+    }
+    return c;
+  }
+
   // Zhang-Suen thinning (for line drawings: one centre line per inked stroke).
   function thin(m, W, H) {
     let changed = true;
@@ -67,6 +85,40 @@ const PhotoTrace = (() => {
       if (pts.length >= minLen) out.push(pts.map((p) => [p % W, (p - p % W) / W]));
     }
     return out;
+  }
+  // Marching squares: the mask's boundary as clean closed loops (half-pixel precision, no gaps).
+  function contours(m, W, H) {
+    const at = (x, y) => (x < 0 || y < 0 || x >= W || y >= H ? 0 : m[y * W + x]);
+    const segs = [];
+    for (let y = -1; y < H; y++) for (let x = -1; x < W; x++) {
+      const c = (at(x, y) << 3) | (at(x + 1, y) << 2) | (at(x + 1, y + 1) << 1) | at(x, y + 1);
+      if (c === 0 || c === 15) continue;
+      const T = [2 * x + 1, 2 * y], R = [2 * x + 2, 2 * y + 1], B = [2 * x + 1, 2 * y + 2], L = [2 * x, 2 * y + 1];
+      switch (c) {
+        case 1: case 14: segs.push([L, B]); break;
+        case 2: case 13: segs.push([B, R]); break;
+        case 3: case 12: segs.push([L, R]); break;
+        case 4: case 11: segs.push([T, R]); break;
+        case 6: case 9: segs.push([T, B]); break;
+        case 7: case 8: segs.push([L, T]); break;
+        case 5: segs.push([L, T], [B, R]); break;
+        case 10: segs.push([T, R], [L, B]); break;
+      }
+    }
+    const key = (p) => p[0] * 100003 + p[1], ends = new Map();
+    segs.forEach((sg, i) => { for (const p of sg) { const k = key(p); if (!ends.has(k)) ends.set(k, []); ends.get(k).push(i); } });
+    const used = new Uint8Array(segs.length), loops = [];
+    for (let i = 0; i < segs.length; i++) {
+      if (used[i]) continue;
+      used[i] = 1; const loop = [segs[i][0], segs[i][1]]; let cur = segs[i][1];
+      for (;;) {
+        const nx = (ends.get(key(cur)) || []).find((j) => !used[j]);
+        if (nx === undefined) break;
+        used[nx] = 1; const sg = segs[nx]; cur = key(sg[0]) === key(cur) ? sg[1] : sg[0]; loop.push(cur);
+      }
+      loops.push(loop.map(([a, b]) => [a / 2, b / 2]));
+    }
+    return loops;
   }
   function smooth(pts, closed, r = 2) {
     if (pts.length < 2 * r + 3) return pts;
@@ -142,39 +194,65 @@ const PhotoTrace = (() => {
     const x1 = clamp(Math.round(box[0] + box[2] + pad), x0 + 1, W), y1 = clamp(Math.round(box[1] + box[3] + pad), y0 + 1, H);
     const inBox = (x, y) => x >= x0 && x < x1 && y >= y0 && y < y1;
 
-    // Watershed: background grows in from the margin between Claude's box and the padding, the subject grows out
-    // from the points Claude marked on it, both in order of edge strength, so they meet on the real edges.
-    const lab0 = new Uint8Array(N), LV = 1024, buckets = Array.from({ length: LV }, () => []);
-    const lev = (i) => Math.min(LV - 1, Math.round(mag[i]));
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (!inBox(x, y)) lab0[y * W + x] = 1;
+    const lab0 = new Uint8Array(N);
     const bx0 = Math.round(box[0]), by0 = Math.round(box[1]), bx1 = Math.round(box[0] + box[2]), by1 = Math.round(box[1] + box[3]);
     const inner0 = (x, y) => x >= bx0 && x < bx1 && y >= by0 && y < by1;
-    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) if (!inner0(x, y)) { const i = y * W + x; lab0[i] = 1; buckets[lev(i)].push(i); }
-    const pts = (Array.isArray(loc.inside) && loc.inside.length ? loc.inside : [[box[0] / f + box[2] / f / 2, box[1] / f + box[3] / f / 2]]).slice(0, 30);
-    for (const [ux, uy] of pts) {
-      const cx = Math.round(ux * f), cy = Math.round(uy * f);
-      for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
-        const x = cx + dx, y = cy + dy; if (dx * dx + dy * dy > 16 || !inBox(x, y)) continue;
-        const i = y * W + x; if (!lab0[i]) { lab0[i] = 2; buckets[lev(i)].push(i); }
+    const disk = (ux, uy, r, fn) => { const cx = Math.round(ux * f), cy = Math.round(uy * f); for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { const x = cx + dx, y = cy + dy; if (dx * dx + dy * dy <= r * r && inBox(x, y)) fn(y * W + x); } };
+    const outs = (Array.isArray(loc.outside) ? loc.outside : []).slice(0, 30);
+    // Watershed: background grows in from the margin between Claude's box and the padding, the subject grows out
+    // from the points Claude marked on it, in order of edge strength, so they meet on the real edges. Colour helps
+    // too: each side pays extra to take pixels that look like the other side (faint edges, pale-on-pale).
+    const LV = 1024, buckets = Array.from({ length: LV }, () => []);
+    const pts = (Array.isArray(loc.inside) && loc.inside.length ? loc.inside : [[box[0] / f + box[2] / f / 2, box[1] / f + box[3] / f / 2]]).slice(0, 40);
+    // Colour models.
+    const fs = [], bs = [];
+    for (const [ux, uy] of pts) disk(ux, uy, 6, (i) => fs.push(px[i * 4], px[i * 4 + 1], px[i * 4 + 2]));
+    const st2 = Math.max(1, Math.round(Math.sqrt((x1 - x0) * (y1 - y0) / 20000)));
+    for (let y = y0; y < y1; y += st2) for (let x = x0; x < x1; x += st2) if (!inner0(x, y)) { const i = (y * W + x) * 4; bs.push(px[i], px[i + 1], px[i + 2]); }
+    for (const [ux, uy] of outs) disk(ux, uy, 4, (i) => bs.push(px[i * 4], px[i * 4 + 1], px[i * 4 + 2]));
+    const CF = kmeans(fs, 8), CB = kmeans(bs, 8);
+    const near = (C, i) => { let bd = Infinity; for (const c of C) { const d = (px[i * 4] - c[0]) ** 2 + (px[i * 4 + 1] - c[1]) ** 2 + (px[i * 4 + 2] - c[2]) ** 2; if (d < bd) bd = d; } return Math.sqrt(bd); };
+    const lean = new Float32Array(N);   // > 0 looks like the subject, < 0 like the background
+    if (CF.length && CB.length) for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) { const i = y * W + x; lean[i] = near(CB, i) - near(CF, i); }
+    // What counts as a wall: in photos, edges (lettering and markings Claude boxed don't count);
+    // in line drawings, the ink, thickened so hairline gaps between lines still hold.
+    let sm;
+    if (drawing) {
+      const gv = []; for (let y = y0; y < y1; y += 2) for (let x = x0; x < x1; x += 2) gv.push(gray[y * W + x]);
+      const thr = (pct(gv, 0.02) + pct(gv, 0.6)) / 2;
+      const ink = new Uint8Array(N); for (let i = 0; i < N; i++) ink[i] = gray[i] < thr ? 1 : 0;
+      const near1 = morph(ink, W, H, 2, true), near2 = morph(ink, W, H, 4, true);
+      sm = new Float32Array(N); for (let i = 0; i < N; i++) sm[i] = ink[i] ? 400 : near1[i] ? 300 : near2[i] ? 200 : 0;
+      lean.fill(0);
+    } else {
+      sm = mag.slice();
+      for (const [ex, ey, ew, eh] of (loc.erase || []).slice(0, 30)) {
+        for (let y = clamp(Math.round((ey + 2) * f), 0, H); y < clamp(Math.round((ey + eh - 2) * f), 0, H); y++) for (let x = clamp(Math.round((ex + 2) * f), 0, W); x < clamp(Math.round((ex + ew - 2) * f), 0, W); x++) sm[y * W + x] *= 0.15;
       }
     }
-    for (const [ux, uy] of (Array.isArray(loc.outside) ? loc.outside : []).slice(0, 30)) {
-      const cx = Math.round(ux * f), cy = Math.round(uy * f);
-      for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
-        const x = cx + dx, y = cy + dy; if (dx * dx + dy * dy > 9 || !inBox(x, y)) continue;
-        const i = y * W + x; if (!lab0[i]) { lab0[i] = 1; buckets[lev(i)].push(i); }
+    const cost = (j, me) => Math.min(LV - 1, Math.round(sm[j] + Math.min(40, 0.4 * Math.max(0, me === 1 ? lean[j] : -lean[j]))));
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (!inBox(x, y)) lab0[y * W + x] = 1;
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) if (!inner0(x, y)) { const i = y * W + x; lab0[i] = 1; buckets[0].push(i * 2); }
+    for (const [ux, uy] of outs) disk(ux, uy, 4, (i) => { if (!lab0[i]) { lab0[i] = 1; buckets[0].push(i * 2); } });
+    for (const [ux, uy] of pts) disk(ux, uy, 6, (i) => { if (!lab0[i]) { lab0[i] = 2; buckets[0].push(i * 2 + 1); } });
+    // Split the queue by side so ties go to the subject (enclosed regions both sides reach at once).
+    const fgB = Array.from({ length: LV }, () => []);
+    for (let L = 0; L < LV; L++) { const keep = []; for (const e of buckets[L]) (e & 1 ? fgB[L] : keep).push(e); buckets[L] = keep; }
+    const done = new Uint8Array(N);
+    const step = (e, L) => {
+      const i = e >> 1, me = (e & 1) + 1;
+      if (done[i] || (lab0[i] && lab0[i] !== me)) return;
+      done[i] = 1; lab0[i] = me;
+      const x = i % W, y = (i - x) / W;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const xx = x + dx, yy = y + dy; if (!inBox(xx, yy)) continue;
+        const j = yy * W + xx; if (lab0[j]) continue;
+        const l = Math.max(L, cost(j, me)); (me === 2 ? fgB : buckets)[l].push(j * 2 + me - 1);
       }
-    }
+    };
     for (let L = 0; L < LV; L++) {
-      const bk = buckets[L];
-      while (bk.length) {
-        const i = bk.pop(), x = i % W, y = (i - x) / W, me = lab0[i];
-        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-          const xx = x + dx, yy = y + dy; if (!inBox(xx, yy)) continue;
-          const j = yy * W + xx; if (lab0[j]) continue;
-          lab0[j] = me; const l = Math.max(L, lev(j)); buckets[l].push(j);
-        }
-      }
+      const fb = fgB[L], bb = buckets[L];
+      while (fb.length || bb.length) { if (fb.length) step(fb.pop(), L); else step(bb.pop(), L); }
     }
     const bg = new Uint8Array(N), q = new Int32Array(N); let qh = 0, qt = 0;
     for (let i = 0; i < N; i++) bg[i] = lab0[i] === 2 ? 0 : 1;
@@ -215,22 +293,33 @@ const PhotoTrace = (() => {
     const frac = area / ((x1 - x0) * (y1 - y0));
     if (frac < 0.04 || frac > 0.96) return { ok: false, frac, dbg: {} };
 
-    // Outline: the subject's boundary, smoothed lightly.
-    const edgeOut = new Uint8Array(N);
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-      const i = y * W + x; if (!fg[i]) continue;
-      if (x === 0 || y === 0 || x === W - 1 || y === H - 1 || !fg[i - 1] || !fg[i + 1] || !fg[i - W] || !fg[i + W]) edgeOut[i] = 1;
+    // Fill small holes (painted lettering, rivets) so they don't become outline loops.
+    {
+      const out = new Uint8Array(N); qh = 0; qt = 0;
+      for (let x = 0; x < W; x++) for (const y of [0, H - 1]) { const i = y * W + x; if (!fg[i] && !out[i]) { out[i] = 1; q[qt++] = i; } }
+      for (let y = 0; y < H; y++) for (const x of [0, W - 1]) { const i = y * W + x; if (!fg[i] && !out[i]) { out[i] = 1; q[qt++] = i; } }
+      while (qh < qt) { const i = q[qh++], x = i % W, y = (i - x) / W; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue; const j = yy * W + xx; if (!fg[j] && !out[j]) { out[j] = 1; q[qt++] = j; } } }
+      const seen = new Uint8Array(N), maxHole = drawing ? N : Math.max(400, area * 0.01);
+      for (let i = 0; i < N; i++) {
+        if (fg[i] || out[i] || seen[i]) continue;
+        const reg = []; qh = 0; qt = 0; q[qt++] = i; seen[i] = 1;
+        while (qh < qt) { const p = q[qh++], x = p % W, y = (p - x) / W; reg.push(p); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue; const j = yy * W + xx; if (!fg[j] && !out[j] && !seen[j]) { seen[j] = 1; q[qt++] = j; } } }
+        if (reg.length <= maxHole) for (const p of reg) fg[p] = 1;
+      }
     }
+    if (drawing) fg = morph(fg, W, H, 3, false);   // sit the outline on the drawn line, not beside it
+    // Outline: the subject's boundary loops, smoothed lightly.
     const r1 = (v) => String(Math.round(v / f * 10) / 10);
     const toD = (pts, closed) => 'M' + pts.map(([x, y]) => r1(x) + ' ' + r1(y)).join('L') + (closed ? 'Z' : '');
     const outline = [];
-    for (const ch of chainsOf(edgeOut, W, H, 10).sort((p, q2) => q2.length - p.length)) {
-      const closed = Math.hypot(ch[0][0] - ch[ch.length - 1][0], ch[0][1] - ch[ch.length - 1][1]) <= 2.5;
-      outline.push(toD(rdp(smooth(smooth(ch, closed, 3), closed, 2), 1.0), closed));
+    for (const lp of contours(fg, W, H).filter((l) => l.length >= 24).sort((p, q2) => q2.length - p.length)) {
+      const clean = level !== 'detailed';
+      const sm = clean ? smooth(smooth(smooth(lp, true, 4), true, 3), true, 2) : smooth(smooth(lp, true, 3), true, 2);
+      outline.push(toD(rdp(sm.concat([sm[0]]), clean ? 1.8 : 0.9).slice(0, -1), true));
     }
 
     // Details inside the subject.
-    const inner = morph(fg, W, H, drawing ? 2 : 3, false);
+    const inner = morph(fg, W, H, drawing ? 4 : 3, false);
     // Lettering, logos and markings Claude boxed are left out of the details (the outline is untouched).
     for (const [ex, ey, ew, eh] of (loc.erase || []).slice(0, 30)) {
       for (let y = clamp(Math.round(ey * f), 0, H); y < clamp(Math.round((ey + eh) * f), 0, H); y++) for (let x = clamp(Math.round(ex * f), 0, W); x < clamp(Math.round((ex + ew) * f), 0, W); x++) inner[y * W + x] = 0;
@@ -256,18 +345,18 @@ const PhotoTrace = (() => {
         const i = st.pop(), x = i % W, y = (i - x) / W;
         for (const [dx, dy] of NB) { const j = (y + dy) * W + (x + dx); if (j > 0 && j < N && !edge[j] && nms[j] >= lo) { edge[j] = 1; st.push(j); } }
       }
-      detail = chainsOf(edge, W, H, level === 'detailed' ? 14 : 22).filter((pts) => {
+      detail = chainsOf(edge, W, H, level === 'detailed' ? 14 : 34).filter((pts) => {
         // Skip squiggles (texture, noise): keep long or fairly straight runs.
         const s = pts[0], e = pts[pts.length - 1], span = Math.hypot(e[0] - s[0], e[1] - s[1]);
         return !(pts.length < 40 && pts.length > 2.6 * Math.max(span, 1));
       }).map((pts) => { let s = 0; for (const [x, y] of pts) s += mag[y * W + x]; return { pts, str: (s / pts.length) * Math.sqrt(pts.length) }; });
     }
     detail.sort((p, q2) => q2.str - p.str);
-    if (level !== 'detailed') detail = detail.slice(0, 90);
+    if (level !== 'detailed') detail = detail.slice(0, 45);
     let budget = level === 'detailed' ? 200000 : 60000;
     const segs = [];
-    for (const d of detail) { const s = toD(rdp(smooth(d.pts, false, 1), level === 'detailed' ? 1.2 : 1.4), false); if ((budget -= s.length) < 0) break; segs.push(s); }
-    const cut = Math.max(1, Math.round(segs.length * (level === 'detailed' ? 0.35 : 0.5)));
+    for (const d of detail) { const s = toD(rdp(smooth(d.pts, false, level === 'detailed' ? 1 : 3), level === 'detailed' ? 1.2 : 2.2), false); if ((budget -= s.length) < 0) break; segs.push(s); }
+    const cut = Math.max(1, Math.round(segs.length * (level === 'detailed' ? 0.35 : 0.6)));
     return { ok: true, frac, dbg: {}, H: Math.round(H / f), outline: pack(outline), strong: pack(segs.slice(0, cut)), weak: pack(segs.slice(cut)) };
   }
 
