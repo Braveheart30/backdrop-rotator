@@ -195,7 +195,7 @@ const PhotoTrace = (() => {
       for (let y = clamp(Math.round(ey * f), 0, H); y < clamp(Math.round((ey + eh) * f), 0, H); y++) for (let x = clamp(Math.round(ex * f), 0, W); x < clamp(Math.round((ex + ew) * f), 0, W); x++) fg[y * W + x] = 0;
     }
     fg = morph(morph(fg, W, H, 2, true), W, H, 2, false);   // close small gaps
-    fg = morph(morph(fg, W, H, 3, false), W, H, 3, true);   // drop specks and spikes
+    fg = morph(morph(fg, W, H, 2, false), W, H, 2, true);   // drop specks and spikes
     // Thin rotor blades are drawn (and animated) by the app, so take them out of the photo outline.
     for (const r of loc.rotors || []) {
       if (!r || !Array.isArray(r.hub)) continue;
