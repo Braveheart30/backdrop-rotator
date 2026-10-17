@@ -25,7 +25,7 @@ else (() => {
   const look = () => BR.look(settings);
   const save = async (patch) => { Object.assign(settings, patch); await BR.saveSettings(patch); };
   const tile = (box, sk, thumb = true) => {
-    box.style.background = Sketch.background(look());
+    box.style.background = Sketch.background(look(), sk);
     box.innerHTML = Sketch.render(sk, look(), { thumb });
   };
 
@@ -50,6 +50,10 @@ else (() => {
       const o = el('option', null, label); o.value = v; return o;
     }));
     $('#motionSpeed').value = s.motionSpeed || 'normal';
+    $('#sketchStyle').replaceChildren(...Object.entries(Sketch.LOOKS).map(([v, l]) => { const o = el('option', null, l.name); o.value = v; return o; }));
+    $('#sketchStyle').value = s.sketchStyle || 'neon';
+    $('#edLivery').replaceChildren(el('option', null, 'Use my default'), ...Object.entries(Sketch.LOOKS).map(([v, l]) => { const o = el('option', null, l.name); o.value = v; return o; }));
+    $('#edLivery').firstChild.value = '';
     $('#edMotion').replaceChildren(el('option', null, 'Use my default'), ...Object.entries(Sketch.MOTIONS).map(([v, label]) => {
       const o = el('option', null, label); o.value = v; return o;
     }));
@@ -255,18 +259,18 @@ else (() => {
   $('#claudeKey').addEventListener('change', async (e) => { await save({ claudeKey: e.target.value.trim() }); syncKeyBox(); });
   $('#claudeModel').addEventListener('change', (e) => save({ claudeModel: e.target.value }));
 
-  // ---------- Per-sketch editor (word, motion, speed) ----------
+  // ---------- Per-sketch editor (word, livery, motion, speed) ----------
   let editing = null;
   function editDraft() {
     if (!editing) return null;
     return { ...editing.sketch, text: Sketch.cleanText($('#edText').value),
-      motion: $('#edMotion').value || undefined, speed: $('#edSpeed').value || undefined };
+      livery: $('#edLivery').value || undefined, motion: $('#edMotion').value || undefined, speed: $('#edSpeed').value || undefined };
   }
   function renderEditor() {
     const d = editDraft();
     if (!d) return;
     const box = $('#edCanvas');
-    box.style.background = Sketch.background(look());
+    box.style.background = Sketch.background(look(), d);
     box.innerHTML = Sketch.render(d, look(), {});
     $('#edNote').textContent = settings.eco ? 'Eco mode is on, so motion is paused everywhere until you turn it off.' : '';
   }
@@ -274,6 +278,7 @@ else (() => {
     editing = rec;
     $('#edName').textContent = rec.name || 'Sketch';
     $('#edText').value = rec.sketch.text || '';
+    $('#edLivery').value = rec.sketch.livery || '';
     $('#edMotion').value = rec.sketch.motion || '';
     $('#edSpeed').value = rec.sketch.speed || '';
     $('#editor').hidden = false;
@@ -282,6 +287,7 @@ else (() => {
   }
   $('#edText').addEventListener('input', renderEditor);
   $('#edMotion').addEventListener('change', renderEditor);
+  $('#edLivery').addEventListener('change', renderEditor);
   $('#edSpeed').addEventListener('change', renderEditor);
   $('#edClose').addEventListener('click', () => { editing = null; $('#editor').hidden = true; $('#edCanvas').replaceChildren(); });
   $('#edSave').addEventListener('click', async () => {
@@ -290,6 +296,7 @@ else (() => {
     editing.sketch.text = d.text;
     if (d.motion) editing.sketch.motion = d.motion; else delete editing.sketch.motion;
     if (d.speed) editing.sketch.speed = d.speed; else delete editing.sketch.speed;
+    if (d.livery) editing.sketch.livery = d.livery; else delete editing.sketch.livery;
     await BR.putImage(editing);
     await save({ currentId: editing.id, lastChange: Date.now(), editStamp: Date.now() });
     toast(`Saved "${editing.name}". It's showing on your new tab now.`);

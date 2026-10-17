@@ -9,6 +9,7 @@ else (() => {
   const announce = () => { if (!announced) { announced = true; Bridge.ready(); } };
   const lookKey = (s) => [s.sketchStyle, s.accent, s.textPos, s.animate, s.motion, s.motionSpeed, s.eco, s.editStamp].join('|');
 
+  let shownSketch = null;
   // Crossfade to a sketch.
   async function show(id, force = false) {
     const key = id + '|' + lookKey(settings);
@@ -17,8 +18,12 @@ else (() => {
     if (!BR.isSketch(rec)) return false;
     const look = BR.look(settings);
     const back = layers[1 - front];
-    back.style.background = Sketch.background(look);
+    back.style.background = Sketch.background(look, rec.sketch);
     back.innerHTML = Sketch.render(rec.sketch, look);
+    // The clock, date and page edge follow the livery of the sketch on screen.
+    shownSketch = rec.sketch;
+    document.body.classList.toggle('light', Sketch.isLight(look, rec.sketch));
+    document.documentElement.style.background = Sketch.background(look, rec.sketch);
     back.classList.add('visible');
     layers[front].classList.remove('visible');
     front = 1 - front; shownKey = key;
@@ -28,10 +33,10 @@ else (() => {
   function applyUI(s) {
     const b = document.body;
     ['corner', 'top', 'center', 'hidden'].forEach((c) => b.classList.toggle('clock-' + c, s.clockStyle === c));
-    b.classList.toggle('light', Sketch.isLight(BR.look(s)));
+    b.classList.toggle('light', Sketch.isLight(BR.look(s), shownSketch));
     document.getElementById('search').classList.toggle('off', !s.search);
     dateEl.classList.toggle('off', !s.showDate);
-    document.documentElement.style.background = Sketch.background(BR.look(s));
+    document.documentElement.style.background = Sketch.background(BR.look(s), shownSketch);
     tickClock();
   }
 

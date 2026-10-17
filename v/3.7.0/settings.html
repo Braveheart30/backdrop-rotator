@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Backdrop Rotator Settings</title>
+  <link rel="stylesheet" href="css/settings.css">
+</head>
+<body>
+  <div class="safety-bar">
+    <button id="appStop" class="stop-mini" title="Stops the app and Claude instantly (shortcut Alt+Shift+X)">■ Stop everything</button>
+    <button id="openControl" class="btn ghost sm">Control Center: access &amp; updates</button>
+    <span id="ecoBadge" class="eco-badge" hidden>🌱 Eco mode on</span>
+  </div>
+  <div id="updBanner" class="upd-banner" hidden></div>
+  <header>
+    <h1>Backdrop Rotator</h1>
+    <p>Minimal line sketches for every new tab, all in one calm style. Nothing is downloaded from the web.</p>
+    <nav class="jump">
+      <a href="#create">Create</a><a href="#look">Look</a><a href="#page">New tab</a><a href="#library">Library</a><a href="#eco">Eco mode</a>
+    </nav>
+  </header>
+
+  <section class="card" id="create">
+    <h2>Create</h2>
+    <p class="hint">Pick ready-made sketches, have the app invent a new one, or ask Claude to draw anything. Everything comes out in your look.</p>
+    <label class="field" for="skText">Word for new sketches <span class="opt">(optional · e.g. FOCUS, BEAT NAVY)</span></label>
+    <input id="skText" class="text-in" type="text" maxlength="24" placeholder="Leave empty for no word" autocomplete="off">
+
+    <h3 class="sub">Ready-made</h3>
+    <div id="skGrid" class="sk-grid"></div>
+    <div class="ai-actions">
+      <button id="skAdd" class="btn" disabled>Add selected</button>
+      <button id="skAll" class="btn ghost">Select all</button>
+      <span id="skStatus" class="note"></span>
+    </div>
+
+    <h3 class="sub">Surprise me <span class="opt">(made on your computer, free, no internet)</span></h3>
+    <div class="gen-row" id="genRow"></div>
+
+    <div class="claude-box">
+      <h3>✨ Claude sketches</h3>
+      <p class="hint">Claude draws anything you describe, words included, in <strong>Sketch Studio</strong>, free on your Claude plan. Open it in Edge and every sketch you keep there shows up here and on your new tab by itself.</p>
+      <div class="ai-actions">
+        <a id="studioLink" class="btn" href="https://claude.ai/artifact/CJqeMyz6izq7x8nLyaeuY2" target="_blank" rel="noopener">Open Sketch Studio</a>
+      </div>
+      <label class="field" for="clReply">Paste from Sketch Studio <span class="opt">(only needed if sync is off)</span></label>
+      <textarea id="clReply" class="cl-reply" rows="2" placeholder="Paste here (Ctrl+V). Sketches are added right away."></textarea>
+      <div id="clStatus" class="status" role="status"></div>
+      <div id="clKeyBox" hidden>
+        <form id="clForm" class="theme-form">
+          <input id="clInput" type="text" maxlength="200" placeholder="With an API key: describe it and draw here" autocomplete="off" required>
+          <button id="clBtn" class="btn" type="submit">Draw</button>
+        </form>
+      </div>
+      <details id="clSettings" class="url-add">
+        <summary>Optional: Anthropic API key (draws without leaving the app, paid)</summary>
+        <div class="ai-grid">
+          <label class="wide">Anthropic API key
+            <input id="claudeKey" type="password" placeholder="sk-ant-…" autocomplete="off">
+          </label>
+          <label>Model
+            <select id="claudeModel"></select>
+          </label>
+        </div>
+        <p class="note">Get a key at platform.claude.com → API keys. Anthropic bills your account for each drawing (around 2¢ with Sonnet). The key stays in this browser and is only sent to Anthropic. Eco mode always uses Haiku, the lightest model.</p>
+      </details>
+    </div>
+
+    <div id="preview" class="preview" hidden>
+      <div id="pvCanvas" class="cl-canvas"></div>
+      <div class="pv-row">
+        <label class="pv-word">Word
+          <input id="pvText" type="text" maxlength="24" placeholder="No word" autocomplete="off">
+        </label>
+        <div class="ai-actions">
+          <button id="pvKeep" class="btn">Add to backgrounds</button>
+          <button id="pvAgain" class="btn ghost">Another</button>
+        </div>
+      </div>
+      <p id="pvNote" class="note"></p>
+    </div>
+  </section>
+
+  <section class="card" id="look">
+    <h2>Look</h2>
+    <p class="hint">One look for every sketch, so your new tab always stays on theme.</p>
+    <div class="look-grid">
+      <div>
+        <div class="row" style="border-top:0">
+          <label for="sketchStyle">Style</label>
+          <select id="sketchStyle"></select>
+        </div>
+        <div class="row" id="accentRow">
+          <span>Neon color</span>
+          <div id="swatches" class="swatches" role="radiogroup" aria-label="Neon color"></div>
+        </div>
+        <div class="row">
+          <label for="textPos">Word position</label>
+          <select id="textPos">
+            <option value="above">Above the drawing</option>
+            <option value="below">Below the drawing</option>
+          </select>
+        </div>
+        <div class="row"><label for="animate">Draw-in animation</label><input id="animate" type="checkbox" class="switch"></div>
+        <div class="row">
+          <label for="motion">Motion <span class="opt" id="motionNote"></span></label>
+          <select id="motion"></select>
+        </div>
+        <div class="row">
+          <label for="motionSpeed">Motion speed</label>
+          <select id="motionSpeed"></select>
+        </div>
+      </div>
+      <div id="lookPreview" class="cl-canvas look-pv"></div>
+    </div>
+  </section>
+
+  <section class="card" id="page">
+    <h2>New tab</h2>
+    <div class="row" style="border-top:0">
+      <label for="clockStyle">Clock</label>
+      <select id="clockStyle">
+        <option value="corner">Small, top-left corner</option>
+        <option value="top">Centered across the top</option>
+        <option value="center">Large in the middle (sketch dims behind it)</option>
+        <option value="hidden">Hidden</option>
+      </select>
+    </div>
+    <div class="row"><label for="clock24">24-hour time</label><input id="clock24" type="checkbox" class="switch"></div>
+    <div class="row"><label for="showDate">Show the date</label><input id="showDate" type="checkbox" class="switch"></div>
+    <div class="row"><label for="showSeconds">Show seconds</label><input id="showSeconds" type="checkbox" class="switch"></div>
+    <div class="row"><label for="search">Search box</label><input id="search" type="checkbox" class="switch"></div>
+    <div class="row">
+      <label for="mode">Change sketch</label>
+      <select id="mode">
+        <option value="newtab">Every new tab</option>
+        <option value="interval">On a timer</option>
+        <option value="daily">Once a day</option>
+      </select>
+    </div>
+    <div class="row" id="intervalRow">
+      <label for="intervalMin">Every</label>
+      <span class="inline"><input id="intervalMin" type="number" min="1" max="1440"> minutes</span>
+    </div>
+    <div class="row">
+      <label for="order">Order</label>
+      <select id="order">
+        <option value="shuffle">Shuffle (no repeats until all shown)</option>
+        <option value="sequence">In order added</option>
+      </select>
+    </div>
+  </section>
+
+  <section class="card" id="library">
+    <div class="lib-head">
+      <h2>Library <span id="count"></span></h2>
+    </div>
+    <p class="hint">Click a sketch to show it now. ⚙ sets its own word, livery, motion and speed.</p>
+    <div id="editor" class="editor" hidden>
+      <div id="edCanvas" class="cl-canvas"></div>
+      <div class="ed-fields">
+        <h3 id="edName">Sketch</h3>
+        <label class="field" for="edText">Word <span class="opt">(empty for none)</span></label>
+        <input id="edText" class="text-in" type="text" maxlength="24" autocomplete="off" placeholder="No word">
+        <label class="field" for="edLivery">Livery</label>
+        <select id="edLivery"></select>
+        <label class="field" for="edMotion">Motion</label>
+        <select id="edMotion"></select>
+        <label class="field" for="edSpeed">Speed</label>
+        <select id="edSpeed"></select>
+        <p class="note" id="edNote"></p>
+        <div class="ai-actions">
+          <button id="edSave" class="btn" type="button">Save</button>
+          <button id="edClose" class="btn ghost" type="button">Close</button>
+        </div>
+      </div>
+    </div>
+    <div id="legacy" class="legacy" hidden></div>
+    <div id="grid"></div>
+    <p id="libEmpty" class="empty-note" hidden>No sketches yet. Add some above.</p>
+  </section>
+
+  <section class="card" id="eco">
+    <div class="row first">
+      <div>
+        <h2>🌱 Eco mode</h2>
+        <p class="hint" style="margin:0">Sketches already use almost no energy. Eco mode keeps Claude light too.</p>
+      </div>
+      <input id="ecoSw" type="checkbox" class="switch" aria-label="Eco mode">
+    </div>
+    <ul class="eco-list">
+      <li><strong>Lighter AI:</strong> Claude drawings always use Haiku, the smallest, most efficient model.</li>
+      <li><strong>Fewer AI requests:</strong> at most 5 Claude drawings per day. <span id="aiCount"></span></li>
+      <li><strong>No motion:</strong> backgrounds stay still after drawing in.</li>
+      <li>“Surprise me” and ready-made sketches are made on your computer and aren't limited.</li>
+    </ul>
+  </section>
+
+  <footer id="footer"></footer>
+  <div id="toast" role="status"></div>
+
+  <script src="js/bridge.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/sketch.js"></script>
+  <script src="js/claude.js"></script>
+  <script src="js/settings.js"></script>
+</body>
+</html>

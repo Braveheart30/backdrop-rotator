@@ -89,11 +89,7 @@
       <div>
         <div class="row" style="border-top:0">
           <label for="sketchStyle">Style</label>
-          <select id="sketchStyle">
-            <option value="neon">Neon glow on black</option>
-            <option value="dark">White on black</option>
-            <option value="light">Black on white</option>
-          </select>
+          <select id="sketchStyle"></select>
         </div>
         <div class="row" id="accentRow">
           <span>Neon color</span>
@@ -160,13 +156,15 @@
     <div class="lib-head">
       <h2>Library <span id="count"></span></h2>
     </div>
-    <p class="hint">Click a sketch to show it now. ⚙ sets its own word, motion and speed.</p>
+    <p class="hint">Click a sketch to show it now. ⚙ sets its own word, livery, motion and speed.</p>
     <div id="editor" class="editor" hidden>
       <div id="edCanvas" class="cl-canvas"></div>
       <div class="ed-fields">
         <h3 id="edName">Sketch</h3>
         <label class="field" for="edText">Word <span class="opt">(empty for none)</span></label>
         <input id="edText" class="text-in" type="text" maxlength="24" autocomplete="off" placeholder="No word">
+        <label class="field" for="edLivery">Livery</label>
+        <select id="edLivery"></select>
         <label class="field" for="edMotion">Motion</label>
         <select id="edMotion"></select>
         <label class="field" for="edSpeed">Speed</label>

@@ -151,6 +151,7 @@ Reply with ONLY a JSON object, no prose, no code fences:
         const anim = {};
         if (Sketch.MOTIONS[x.motion]) anim.motion = x.motion;
         if (Sketch.SPEEDS[x.speed]) anim.speed = x.speed;
+        if (Sketch.LOOKS[x.livery]) anim.livery = x.livery;
         items.push({ ...v, id, anim });
       } catch (e) { /* skip anything that isn't clean line data */ }
     }

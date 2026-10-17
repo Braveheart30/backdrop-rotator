@@ -1,6 +1,14 @@
 {
-  "latest": "3.6.1",
+  "latest": "3.7.0",
   "versions": [
+    {
+      "version": "3.7.0",
+      "date": "2026-10-17",
+      "notes": [
+        "Liveries: 13 colour schemes (ink on paper, espresso on vanilla, sepia, graphite, blueprint, chalk, Army black and gold, olive drab, night vision, warm low light, and more) plus Auto day/night",
+        "Each sketch can have its own livery (\u2699 in the Library, or pick it in Sketch Studio before you keep)"
+      ]
+    },
     {
       "version": "3.6.1",
       "date": "2026-10-15",

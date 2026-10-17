@@ -1,6 +1,6 @@
 // Library, settings and rotation for Backdrop Rotator (sketch-only edition).
 // Nothing here downloads images from the web: every background is a line drawing stored as a few numbers.
-const APP_VERSION = '3.6.1';
+const APP_VERSION = '3.7.0';
 
 const BR = (() => {
   // ---------- Storage (lives in the extension, reached through the bridge) ----------
@@ -30,7 +30,7 @@ const BR = (() => {
 
   const DEFAULTS = {
     // Look (shared by every sketch so everything stays on theme)
-    sketchStyle: 'neon',   // 'neon' | 'dark' | 'light'
+    sketchStyle: 'neon',   // a livery from Sketch.LOOKS (neon, paper, blueprint, gold, auto...)
     accent: 'blue',        // neon color
     textPos: 'above',      // 'above' | 'below'
     animate: true,         // draw-in animation

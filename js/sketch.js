@@ -132,11 +132,25 @@ const Sketch = (() => {
     }
   };
 
-  // Looks. "neon" glows in the chosen accent color; the others are flat, Apple-style.
+  // Liveries (looks). "neon" glows in the chosen accent colour; the rest set their own colours.
+  // bg is a CSS background (it may include a grid); light = dark lines on a light ground (clock turns dark too).
+  const rg = (a, b, c) => `radial-gradient(ellipse at 50% 45%, ${a} 0%, ${b} 62%, ${c || b} 100%)`;
   const LOOKS = {
     neon: { name: 'Neon glow on black', glow: true, width: 2.4 },
     dark: { name: 'White on black', glow: false, width: 2, bg: '#000000', stroke: '#f5f5f7', text: '#f5f5f7', light: false },
-    light: { name: 'Black on white', glow: false, width: 2, bg: '#f5f5f7', stroke: '#1d1d1f', text: '#1d1d1f', light: true }
+    light: { name: 'Black on white', glow: false, width: 2, bg: '#f5f5f7', stroke: '#1d1d1f', text: '#1d1d1f', light: true },
+    paper: { name: 'Ink on paper', glow: false, width: 2.2, bg: rg('#fbf6ea', '#f1e8d4', '#e4d8bd'), stroke: '#22201c', text: '#2b2722', light: true },
+    vanilla: { name: 'Espresso on vanilla', glow: false, width: 2.2, bg: rg('#fbefcf', '#f2e0b0', '#e6cf96'), stroke: '#3a2618', text: '#4a3020', light: true },
+    sepia: { name: 'Sepia print', glow: false, width: 2.1, bg: rg('#eedcb6', '#dfc699', '#cdb07e'), stroke: '#4e3218', text: '#5a3a1c', light: true },
+    graphite: { name: 'Graphite on stone', glow: false, width: 1.9, bg: rg('#ecebe7', '#dddbd5', '#cfccc4'), stroke: '#2f3033', text: '#3a3b3e', light: true },
+    blueprint: { name: 'Blueprint', glow: false, width: 2, stroke: '#eef6ff', text: '#eef6ff', light: false,
+      bg: 'linear-gradient(rgba(255,255,255,.07) 1px, transparent 1px) 0 0 / 44px 44px, linear-gradient(90deg, rgba(255,255,255,.07) 1px, transparent 1px) 0 0 / 44px 44px, ' + rg('#2862ab', '#184782', '#0f3262') },
+    chalk: { name: 'Chalk on slate', glow: false, width: 2.3, bg: rg('#38483f', '#26312b', '#1b231f'), stroke: '#efeee4', text: '#efeee4', light: false },
+    gold: { name: 'Army black and gold', glow: true, width: 2.2, bg: rg('#1d1a12', '#0b0a08', '#040404'), stroke: '#d9b54a', text: '#ecd27e', light: false },
+    od: { name: 'Olive drab', glow: false, width: 2.2, bg: rg('#4f5b37', '#323c22', '#252d19'), stroke: '#ebe1c1', text: '#ebe1c1', light: false },
+    nvg: { name: 'Night vision', glow: true, width: 2.2, bg: rg('#0d3416', '#04140a', '#010603'), stroke: '#8dff8a', text: '#c9ffc4', light: false },
+    warm: { name: 'Low light (warm, easy on the eyes at night)', glow: false, width: 2, bg: rg('#1d140c', '#0b0805', '#050302'), stroke: '#c8874a', text: '#d9a06a', light: false },
+    auto: { name: 'Auto: ink on paper by day, low light at night' }
   };
   const ACCENTS = {
     blue: { name: 'Electric blue', stroke: '#5cc8ff', text: '#bfe8ff', tint: '#0b1d3a' },
@@ -147,12 +161,14 @@ const Sketch = (() => {
     red: { name: 'Red', stroke: '#ff5c6c', text: '#ffd0d5', tint: '#2b0710' }
   };
 
-  // Resolve the colors for a look (+ accent for neon).
-  function theme(look = {}) {
-    const l = LOOKS[look.style] || LOOKS.neon;
-    if (!l.glow) return l;
+  // Resolve the colours: a sketch's own livery wins over the default look; "auto" follows the time of day.
+  function theme(look = {}, sk) {
+    let style = sk && LOOKS[sk.livery] ? sk.livery : look.style;
+    if (style === 'auto') { const h = new Date().getHours(); style = h >= 7 && h < 19 ? 'paper' : 'warm'; }
+    const l = LOOKS[style] || LOOKS.neon;
+    if (style !== 'neon' && l.stroke) return l;
     const a = ACCENTS[look.accent] || ACCENTS.blue;
-    return { ...l, stroke: a.stroke, text: a.text, light: false,
+    return { ...LOOKS.neon, stroke: a.stroke, text: a.text, light: false,
       bg: `radial-gradient(ellipse at 50% 55%, ${a.tint} 0%, #050b18 55%, #010206 100%)` };
   }
 
@@ -178,7 +194,7 @@ const Sketch = (() => {
       circles: (base.circles || []).filter((c) => Array.isArray(c) && c.length === 3 && c.every(num)),
       rotors: (Array.isArray(base.rotors) ? base.rotors : []).filter((r) => r && Array.isArray(r.hub) && r.hub.length === 2 && r.hub.every(num) && num(r.r) && r.r > 2 && r.r < 900).slice(0, 4) };
     const size = Array.isArray(subj.size) && subj.size.every(num) ? subj.size : [600, 230];
-    const st = theme(look);
+    const st = theme(look, sk);
     const animate = look.animate !== false && !thumb;
     const [w, h] = size;
     const scale = ((thumb ? 1100 : 760) / w) * (num(subj.zoom) ? subj.zoom : 1);
@@ -257,7 +273,7 @@ const Sketch = (() => {
     const gAttrs = `transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(${scale.toFixed(4)})" fill="none" stroke="${st.stroke}"
          stroke-width="${((thumb ? st.width * 2.6 : st.width) * (num(subj.weight) ? subj.weight : 1) / scale).toFixed(3)}" stroke-linecap="round" stroke-linejoin="round"`;
     const sweepLayer = motion === 'sweep'
-      ? `<g mask="url(#swm)"><g ${gAttrs.replace(`stroke="${st.stroke}"`, 'stroke="#ffffff"').replace(/stroke-width="([\d.]+)"/, (m, v) => `stroke-width="${(v * 1.6).toFixed(3)}"`)} opacity="1" filter="url(#g)">${strokes.replace(/ class="d" style="[^"]*"/g, '')}</g></g>`
+      ? `<g mask="url(#swm)"><g ${gAttrs.replace(`stroke="${st.stroke}"`, `stroke="${st.light ? '#000000' : '#ffffff'}"`).replace(/stroke-width="([\d.]+)"/, (m, v) => `stroke-width="${(v * 1.6).toFixed(3)}"`)} opacity="${st.light ? '.55' : '1'}" ${st.glow ? 'filter="url(#g)"' : ''}>${strokes.replace(/ class="d" style="[^"]*"/g, '')}</g></g>`
       : '';
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
       <defs>${glow}${sweepDefs}</defs>${css}${stars}
@@ -266,8 +282,8 @@ const Sketch = (() => {
       ${word}</svg>`;
   }
 
-  const background = (look) => theme(look).bg;
-  const isLight = (look) => !!theme(look).light;
+  const background = (look, sk) => theme(look, sk).bg;
+  const isLight = (look, sk) => !!theme(look, sk).light;
 
   // ---------- "Surprise me": new drawings made on this computer, in the same style ----------
 
