@@ -145,9 +145,9 @@ const PhotoTrace = (() => {
 
   // loc: { box: [x, y, w, h], erase: [[x, y, w, h]], rotors: [{hub, r}], kind: 'photo' | 'drawing' } in drawing units.
   // level: 'clean' (outline + the strongest details) or 'detailed' (many more real edges).
-  async function trace(src, loc, level = 'clean', opts = {}) {
+  async function traceRaw(src, loc, level = 'clean', opts = {}) {
     const img = typeof src === 'string' ? await loadImg(src) : src;
-    const W = 1200, f = W / 600, H = clamp(Math.round(W * img.naturalHeight / img.naturalWidth), 60, 1600), N = W * H;
+    const W = clamp(Math.round(img.naturalWidth || 1200), 1200, 1800), f = W / 600, H = clamp(Math.round(W * img.naturalHeight / img.naturalWidth), 60, 1600), N = W * H;
     const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
     const g = cv.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0, W, H);
     const px = g.getImageData(0, 0, W, H).data;
@@ -320,7 +320,13 @@ const PhotoTrace = (() => {
     const big = Math.max(...areas), keep = areas.map((n) => n >= big * 0.04);
     let area = 0;
     for (let i = 0; i < N; i++) { fg[i] = fg[i] && keep[lab[i]] ? 1 : 0; area += fg[i]; }
-    const frac = area / ((x1 - x0) * (y1 - y0));
+    if (opts.maskD) {   // detail pass: the subject's shape is already known; just fill it in at this zoom
+      const m = document.createElement('canvas'); m.width = W; m.height = H; const mg = m.getContext('2d', { willReadFrequently: true });
+      mg.scale(f, f); mg.fillStyle = '#fff'; for (const d of opts.maskD) { try { mg.fill(new Path2D(d)); } catch (e) {} }
+      const md = mg.getImageData(0, 0, W, H).data; area = 0; for (let i = 0; i < N; i++) { fg[i] = md[i * 4 + 3] > 127 ? 1 : 0; area += fg[i]; }
+      if (area < 50) return { ok: false, frac: 0, dbg: {} };
+    }
+    const frac = opts.maskD ? 0.5 : area / ((x1 - x0) * (y1 - y0));
     if (frac < 0.04 || frac > 0.96) return { ok: false, frac, dbg: {} };
 
     // Fill small holes (painted lettering, rivets) so they don't become outline loops.
@@ -476,6 +482,92 @@ const PhotoTrace = (() => {
     const auto = cands.slice(0, keepN);
     const cut = Math.max(1, Math.round(auto.length * (level === 'detailed' ? 0.35 : 0.6)));
     return { ok: true, frac, dbg: {}, H: Math.round(H / f), outline: pack(outline), strong: pack(auto.slice(0, cut).map((c) => c.d)), weak: pack(auto.slice(cut).map((c) => c.d)), cands };
+  }
+
+  // Rewrite absolute path data with x' = x * k + dx, y' = y * k + dy (arc radii scale by k).
+  const ARGS = { M: 'xy', L: 'xy', T: 'xy', H: 'x', V: 'y', C: 'xyxyxy', S: 'xyxy', Q: 'xyxy', A: 'rrafxy', Z: '' };
+  function mapD(d, k, dx, dy) {
+    const toks = d.match(/[MLHVCSQTAZ]|-?\d*\.?\d+(?:e-?\d+)?/gi) || []; const out = []; let cmd = '', pat = '', i = 0;
+    const r1 = (v) => String(Math.round(v * 10) / 10);
+    for (const t of toks) {
+      if (/^[A-Z]$/i.test(t)) { cmd = t.toUpperCase(); pat = ARGS[cmd] || ''; i = 0; out.push(cmd); continue; }
+      if (!pat) continue;
+      const v = parseFloat(t), role = cmd === 'A' ? 'rrafxy'[i % 7 === 6 ? 5 : i % 7] : pat[i % pat.length];
+      let w;
+      if (cmd === 'A') { const j = i % 7; w = j < 2 ? v * k : j < 5 ? v : j === 5 ? v * k + dx : v * k + dy; }
+      else w = role === 'x' ? v * k + dx : v * k + dy;
+      out.push(r1(w)); i++;
+    }
+    return out.join(' ').replace(/ ?([MLHVCSQTAZ]) /g, '$1');
+  }
+  // Trace a crop around the subject at full detail (a helicopter that fills a third of the photo gets
+  // three times the pixels), then map the result back to the whole photo's coordinates.
+  async function trace(src, loc, level = 'clean', opts = {}) {
+    const img = typeof src === 'string' ? await loadImg(src) : src;
+    const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height, uH = 600 * ih / iw;
+    if (!loc.box || loc.box[2] > 480) return withDetail(img, loc, await traceRaw(img, loc, level, opts), level, opts);
+    const [bx, by, bw, bh] = loc.box, pad = 0.12 * Math.max(bw, bh);
+    const cx0 = Math.max(0, bx - pad), cy0 = Math.max(0, by - pad), cx1 = Math.min(600, bx + bw + pad), cy1 = Math.min(uH, by + bh + pad);
+    const cw = cx1 - cx0, ch = cy1 - cy0, px = iw / 600;
+    const OUTW = Math.min(1800, Math.max(1200, Math.round(cw * px)));   // never shrink the subject below its real pixels
+    const cv = document.createElement('canvas'); cv.width = OUTW; cv.height = Math.max(40, Math.round(OUTW * ch / cw));
+    cv.getContext('2d').drawImage(img, cx0 * px, cy0 * px, cw * px, ch * px, 0, 0, cv.width, cv.height);
+    cv.naturalWidth = cv.width; cv.naturalHeight = cv.height;
+    const s = 600 / cw;   // full-photo units -> crop units
+    const P = ([x, y]) => [(x - cx0) * s, (y - cy0) * s];
+    const L2 = Object.assign({}, loc, {
+      box: [(bx - cx0) * s, (by - cy0) * s, bw * s, bh * s],
+      inside: (loc.inside || []).map(P), outside: (loc.outside || []).map(P),
+      erase: (loc.erase || []).map(([x, y, w, h]) => [(x - cx0) * s, (y - cy0) * s, w * s, h * s]),
+      rotors: (loc.rotors || []).map((r) => Object.assign({}, r, { hub: P(r.hub), r: r.r * s }))
+    });
+    if (loc.ai && loc.ai.length === 320 * 320) {   // resample the AI map to the crop
+      const a = new Float32Array(320 * 320), ai = loc.ai;
+      for (let y = 0; y < 320; y++) for (let x = 0; x < 320; x++) {
+        const fx = Math.min(319, Math.max(0, ((cx0 + (x + 0.5) / 320 * cw) / 600) * 320 - 0.5)), fy = Math.min(319, Math.max(0, ((cy0 + (y + 0.5) / 320 * ch) / uH) * 320 - 0.5));
+        const x0 = Math.floor(fx), y0 = Math.floor(fy), x1 = Math.min(319, x0 + 1), y1 = Math.min(319, y0 + 1), ax = fx - x0, ay = fy - y0;
+        a[y * 320 + x] = (ai[y0 * 320 + x0] * (1 - ax) + ai[y0 * 320 + x1] * ax) * (1 - ay) + (ai[y1 * 320 + x0] * (1 - ax) + ai[y1 * 320 + x1] * ax) * ay;
+      }
+      L2.ai = a;
+    }
+    const r = await traceRaw(cv, L2, level, opts);
+    if (!r.ok) return r;
+    const back = (d) => mapD(d, 1 / s, cx0, cy0);
+    const out = Object.assign({}, r, { H: Math.round(uH), outline: r.outline.map(back), strong: r.strong.map(back), weak: r.weak.map(back),
+      cands: (r.cands || []).map((c) => Object.assign({}, c, { d: back(c.d), len: Math.round(c.len / s), mid: [Math.round(c.mid[0] / s + cx0), Math.round(c.mid[1] / s + cy0)] })) });
+    return withDetail(img, loc, out, level, opts);
+  }
+  // Detail areas (cockpit, intakes...): trace each one again zoomed in, and use those finer lines there.
+  async function withDetail(img, loc, r, level, opts) {
+    const iou = (a, b) => { const x = Math.max(0, Math.min(a[0] + a[2], b[0] + b[2]) - Math.max(a[0], b[0])), y = Math.max(0, Math.min(a[1] + a[3], b[1] + b[3]) - Math.max(a[1], b[1])), i = x * y; return i / (a[2] * a[3] + b[2] * b[3] - i); };
+    const zones = [];
+    for (const b of (opts.detail || [])) if (Array.isArray(b) && b.length === 4 && b[2] > 3 && b[3] > 3 && !zones.some((z) => iou(z, b) > 0.35)) zones.push(b);
+    zones.splice(4);
+    if (!zones.length) return r;
+    const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height, uH = 600 * ih / iw, px = iw / 600;
+    const inZone = (m) => zones.some(([x, y, w, h]) => m[0] >= x && m[0] <= x + w && m[1] >= y && m[1] <= y + h);
+    let cands = (r.cands || []).filter((c) => !inZone(c.mid));
+    for (const [zx, zy, zw, zh] of zones) {
+      const pad = 0.06 * Math.max(zw, zh), cx0 = Math.max(0, zx - pad), cy0 = Math.max(0, zy - pad), cx1 = Math.min(600, zx + zw + pad), cy1 = Math.min(uH, zy + zh + pad);
+      const cw = cx1 - cx0, ch = cy1 - cy0, s = 600 / cw;
+      const OUTW = Math.max(900, Math.min(1600, Math.round(cw * px * 2)));
+      const cv = document.createElement('canvas'); cv.width = OUTW; cv.height = Math.max(40, Math.round(OUTW * ch / cw));
+      cv.getContext('2d').drawImage(img, cx0 * px, cy0 * px, cw * px, ch * px, 0, 0, cv.width, cv.height);
+      cv.naturalWidth = cv.width; cv.naturalHeight = cv.height;
+      const maskD = r.outline.map((d) => mapD(d, s, -cx0 * s, -cy0 * s));
+      const erase = (loc.erase || []).map(([x, y, w, h]) => [(x - cx0) * s, (y - cy0) * s, w * s, h * s]);
+      let z;
+      try { z = await traceRaw(cv, { kind: loc.kind, box: [0, 0, 600, ch * s], inside: [], outside: [], erase, rotors: [] }, 'detailed', { maskD, pool: true }); } catch (e) { continue; }
+      if (!z || !z.ok) continue;
+      const back = (d) => mapD(d, 1 / s, cx0, cy0);
+      for (const c of (z.cands || []).slice(0, 60)) {
+        const mid = [Math.round(c.mid[0] / s + cx0), Math.round(c.mid[1] / s + cy0)];
+        if (!inZone(mid)) continue;
+        cands.push(Object.assign({}, c, { d: back(c.d), len: Math.round(c.len / s), mid, zone: true }));
+      }
+    }
+    cands = cands.map((c, i) => Object.assign({}, c, { id: i + 1 }));
+    return Object.assign({}, r, { cands, zones });
   }
 
   return { trace };
