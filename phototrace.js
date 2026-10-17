@@ -220,7 +220,13 @@ const PhotoTrace = (() => {
         const sub = new Uint8Array(N); for (let i = 0; i < N; i++) sub[i] = A[i] > 0.5 ? 1 : 0;
         const nearSub = morph(sub, W, H, Math.max(6, Math.round(0.012 * W)), true);
         aiBg = new Uint8Array(N); for (let i = 0; i < N; i++) aiBg[i] = !nearSub[i] && A[i] < 0.05 ? 1 : 0;
-        // Claude's points win over the AI: no AI background seeds around anything Claude marked as the subject.
+        // Claude's points win over the AI: no AI subject seeds around anything Claude marked as background (people,
+        // vehicles next to it), and no AI background seeds around anything Claude marked as the subject.
+        { const R2 = Math.round(0.045 * W);
+          for (const [ux, uy] of (Array.isArray(loc.outside) ? loc.outside : [])) {
+            const cx = Math.round(ux * f), cy = Math.round(uy * f);
+            for (let y = Math.max(0, cy - R2); y < Math.min(H, cy + R2); y++) for (let x = Math.max(0, cx - R2); x < Math.min(W, cx + R2); x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= R2 * R2) aiCore[y * W + x] = 0;
+          } }
         const R = Math.round(0.06 * W);
         for (const [ux, uy] of (Array.isArray(loc.inside) ? loc.inside : [])) {
           const cx = Math.round(ux * f), cy = Math.round(uy * f);
