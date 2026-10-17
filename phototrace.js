@@ -560,6 +560,42 @@ const PhotoTrace = (() => {
       try { z = await traceRaw(cv, { kind: loc.kind, box: [0, 0, 600, ch * s], inside: [], outside: [], erase, rotors: [] }, 'detailed', { maskD, pool: true }); } catch (e) { continue; }
       if (!z || !z.ok) continue;
       const back = (d) => mapD(d, 1 / s, cx0, cy0);
+      // Glazing: find the glass (whatever differs clearly from the painted skin) and outline each pane.
+      try {
+        const W2 = cv.width, H2 = cv.height, N2 = W2 * H2, g2 = cv.getContext('2d', { willReadFrequently: true }), pxd = g2.getImageData(0, 0, W2, H2).data;
+        const mk = document.createElement('canvas'); mk.width = W2; mk.height = H2; const mg = mk.getContext('2d', { willReadFrequently: true });
+        const k2 = W2 / 600; mg.scale(k2, k2); mg.fillStyle = '#fff'; for (const d of maskD) { try { mg.fill(new Path2D(d)); } catch (e) {} }
+        const md = mg.getImageData(0, 0, W2, H2).data; let inside = new Uint8Array(N2); for (let i = 0; i < N2; i++) inside[i] = md[i * 4 + 3] > 127 ? 1 : 0;
+        inside = morph(inside, W2, H2, Math.round(0.006 * W2) + 2, false);
+        const rs = [], gs = [], bs = []; for (let i = 0; i < N2; i += 7) if (inside[i]) { rs.push(pxd[i * 4]); gs.push(pxd[i * 4 + 1]); bs.push(pxd[i * 4 + 2]); }
+        if (rs.length > 200) {
+          const paint = [pct(rs, 0.5), pct(gs, 0.5), pct(bs, 0.5)];
+          const dist = new Float32Array(N2), dv = [];
+          for (let i = 0; i < N2; i++) if (inside[i]) { dist[i] = Math.hypot(pxd[i * 4] - paint[0], pxd[i * 4 + 1] - paint[1], pxd[i * 4 + 2] - paint[2]); if (i % 5 === 0) dv.push(dist[i]); }
+          // Otsu split of colour distance: paint vs glass.
+          const hist = new Float64Array(256); for (const v of dv) hist[Math.min(255, v | 0)]++;
+          let sum = 0, tot = dv.length; for (let i = 0; i < 256; i++) sum += i * hist[i];
+          let sB = 0, wB = 0, best = 0, thr = 60;
+          for (let i = 0; i < 256; i++) { wB += hist[i]; if (!wB) continue; const wF = tot - wB; if (!wF) break; sB += i * hist[i]; const mB = sB / wB, mF = (sum - sB) / wF, v = wB * wF * (mB - mF) ** 2; if (v > best) { best = v; thr = i; } }
+          thr = Math.max(thr, 45);
+          let glass = new Uint8Array(N2); for (let i = 0; i < N2; i++) glass[i] = inside[i] && dist[i] > thr ? 1 : 0;
+          const rr = Math.max(2, Math.round(0.004 * W2));
+          glass = morph(morph(glass, W2, H2, rr, true), W2, H2, rr, false);          // close: fill reflections and seams inside a pane
+          glass = morph(morph(glass, W2, H2, rr + 1, false), W2, H2, rr + 1, true);  // open: drop specks and thin lines
+          const kpx = W2 / 600 * s;   // crop pixels per full-photo unit
+          for (const lp of contours(glass, W2, H2).filter((l) => l.length > 0.06 * W2)) {
+            let area = 0; for (let i = 0; i < lp.length; i++) { const a = lp[i], b = lp[(i + 1) % lp.length]; area += a[0] * b[1] - b[0] * a[1]; }
+            area = Math.abs(area) / 2; if (area < 0.002 * N2 || area > 0.5 * N2) continue;
+            const sm = smooth(smooth(lp, true, 3), true, 2), v = rdp(sm.concat([sm[0]]), Math.max(1.2, 0.004 * W2)).slice(0, -1);
+            if (v.length < 3) continue;
+            const r1 = (x) => String(Math.round(x * 10) / 10);
+            const d = 'M' + v.map(([x, y]) => r1(x / k2) + ' ' + r1(y / k2)).join('L') + 'Z';
+            let mx = 0, my = 0; for (const [x, y] of v) { mx += x; my += y; } mx /= v.length; my /= v.length;
+            const mid = [Math.round(mx / k2 / s + cx0), Math.round(my / k2 / s + cy0)];
+            if (inZone(mid)) cands.push({ d: back(d), kind: 'pane', len: Math.round(lp.length / kpx), mid, zone: true, pane: true });
+          }
+        }
+      } catch (e) { /* glazing is a bonus */ }
       for (const c of (z.cands || []).slice(0, 60)) {
         const mid = [Math.round(c.mid[0] / s + cx0), Math.round(c.mid[1] / s + cy0)];
         if (!inZone(mid)) continue;
