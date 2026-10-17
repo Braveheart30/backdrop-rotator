@@ -586,7 +586,18 @@ const PhotoTrace = (() => {
           for (const lp of contours(glass, W2, H2).filter((l) => l.length > 0.06 * W2)) {
             let area = 0; for (let i = 0; i < lp.length; i++) { const a = lp[i], b = lp[(i + 1) % lp.length]; area += a[0] * b[1] - b[0] * a[1]; }
             area = Math.abs(area) / 2; if (area < 0.002 * N2 || area > 0.5 * N2) continue;
-            const sm = smooth(smooth(lp, true, 3), true, 2), v = rdp(sm.concat([sm[0]]), Math.max(1.2, 0.004 * W2)).slice(0, -1);
+            // Window panes are convex: complete the shape where reflections or the crew hide part of the glass.
+            const hull = (pts) => { const P = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]); const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+              const lo = [], up = []; for (const p of P) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+              for (let i = P.length - 1; i >= 0; i--) { const p = P[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
+              return lo.slice(0, -1).concat(up.slice(0, -1)); };
+            const hl = hull(lp); let ha = 0; for (let i = 0; i < hl.length; i++) { const a = hl[i], b = hl[(i + 1) % hl.length]; ha += a[0] * b[1] - b[0] * a[1]; } ha = Math.abs(ha) / 2;
+            let shape = lp;
+            if (area / ha > 0.45) {   // mostly solid: use the convex outline, but only where it stays on the aircraft
+              let ok = 0, n = 0; for (let i = 0; i < hl.length; i++) { const a = hl[i], b = hl[(i + 1) % hl.length]; for (let t = 0; t < 1; t += 0.1) { const x = Math.round(a[0] + (b[0] - a[0]) * t), y = Math.round(a[1] + (b[1] - a[1]) * t); n++; if (x >= 0 && y >= 0 && x < W2 && y < H2 && md[(y * W2 + x) * 4 + 3] > 127) ok++; } }
+              if (ok > 0.92 * n) { shape = []; for (let i = 0; i < hl.length; i++) { const a = hl[i], b = hl[(i + 1) % hl.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]), k = Math.max(1, Math.round(L / 3)); for (let j = 0; j < k; j++) shape.push([a[0] + (b[0] - a[0]) * j / k, a[1] + (b[1] - a[1]) * j / k]); } }
+            }
+            const sm = smooth(smooth(shape, true, 3), true, 2), v = rdp(sm.concat([sm[0]]), Math.max(1.2, 0.004 * W2)).slice(0, -1);
             if (v.length < 3) continue;
             const r1 = (x) => String(Math.round(x * 10) / 10);
             const d = 'M' + v.map(([x, y]) => r1(x / k2) + ' ' + r1(y / k2)).join('L') + 'Z';
