@@ -1,6 +1,13 @@
 {
-  "latest": "3.9.2",
+  "latest": "3.10.0",
   "versions": [
+    {
+      "version": "3.10.0",
+      "date": "2026-10-18",
+      "notes": [
+        "New built-in sketches: UH-60 Black Hawk and M1 Abrams. Polish pass on every sketch (winglet, headlight bar, canopy frame, bridge mast, water reflections and more)."
+      ]
+    },
     {
       "version": "3.9.2",
       "date": "2026-10-18",
