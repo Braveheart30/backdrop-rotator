@@ -66,3 +66,30 @@ body.empty #nextBtn { display: none; }
 #nextBtn.spin svg { transform: rotate(360deg); }
 
 @media (max-width: 640px) { #search { display: none; } }
+
+/* Countdown under the clock */
+#countdown { font-size: 12px; letter-spacing: .22em; text-transform: uppercase; opacity: .75; }
+body.clock-corner #clock { flex-wrap: wrap; }
+body.clock-corner #countdown { flex-basis: 100%; margin-top: 2px; }
+body.clock-top #countdown, body.clock-center #countdown { font-size: 13px; }
+
+/* Focus view: just the sketch */
+body.zen #bar, body.zen #controls { opacity: 0; pointer-events: none; transition: opacity .4s; }
+body.zen #controls:hover { opacity: 1; pointer-events: auto; }
+
+#toast {
+  position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 12px); z-index: 4; opacity: 0; pointer-events: none;
+  padding: 8px 16px; border-radius: 999px; background: color-mix(in srgb, var(--fg) 12%, transparent); border: 1px solid var(--line);
+  backdrop-filter: blur(8px); font-size: 13px; transition: opacity .25s, transform .25s;
+}
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+#help {
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 5; width: min(360px, calc(100vw - 32px));
+  padding: 20px 24px; border-radius: 16px; background: color-mix(in srgb, var(--fg) 10%, rgba(0,0,0,.55)); border: 1px solid var(--line);
+  backdrop-filter: blur(14px);
+}
+body.light #help { background: rgba(255,255,255,.75); }
+#help h2 { margin: 0 0 12px; font-size: 16px; font-weight: 600; }
+#help dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; margin: 0; font-size: 14px; }
+#help dt { font-weight: 600; font-variant-numeric: tabular-nums; }
+#help dd { margin: 0; opacity: .8; }

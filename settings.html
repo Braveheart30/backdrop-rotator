@@ -131,6 +131,14 @@
     <div class="row"><label for="showDate">Show the date</label><input id="showDate" type="checkbox" class="switch"></div>
     <div class="row"><label for="showSeconds">Show seconds</label><input id="showSeconds" type="checkbox" class="switch"></div>
     <div class="row"><label for="search">Search box</label><input id="search" type="checkbox" class="switch"></div>
+    <div class="row"><label for="zen">Focus view <span class="opt">(only the sketch; press F on the new tab)</span></label><input id="zen" type="checkbox" class="switch"></div>
+    <div class="row cd-row">
+      <label for="countdownName">Countdown</label>
+      <span class="cd-in">
+        <input id="countdownName" class="text-in" type="text" maxlength="24" autocomplete="off" placeholder="e.g. ARMY-NAVY">
+        <input id="countdownDate" class="text-in" type="date" aria-label="Countdown date">
+      </span>
+    </div>
     <div class="row">
       <label for="mode">Change sketch</label>
       <select id="mode">
@@ -156,7 +164,7 @@
     <div class="lib-head">
       <h2>Library <span id="count"></span></h2>
     </div>
-    <p class="hint">Click a sketch to show it now. ⚙ sets its own word, livery, motion and speed.</p>
+    <p class="hint">Click a sketch to show it now. ⚙ sets its own word, livery, motion and speed, and saves it as a wallpaper image.</p>
     <div id="editor" class="editor" hidden>
       <div id="edCanvas" class="cl-canvas"></div>
       <div class="ed-fields">
@@ -172,6 +180,8 @@
         <p class="note" id="edNote"></p>
         <div class="ai-actions">
           <button id="edSave" class="btn" type="button">Save</button>
+          <button id="edImgDesk" class="btn ghost" type="button" title="Save this sketch as a desktop wallpaper image">Desktop image</button>
+          <button id="edImgPhone" class="btn ghost" type="button" title="Save this sketch as a phone wallpaper image">Phone image</button>
           <button id="edClose" class="btn ghost" type="button">Close</button>
         </div>
       </div>

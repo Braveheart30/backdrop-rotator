@@ -1,6 +1,16 @@
 {
-  "latest": "3.7.0",
+  "latest": "3.8.0",
   "versions": [
+    {
+      "version": "3.8.0",
+      "date": "2026-10-17",
+      "notes": [
+        "Countdown under the clock (e.g. 34 DAYS TO ARMY-NAVY)",
+        "New tab shortcuts: N/P next and previous sketch, L/Shift+L change livery, F Focus view, / search, ? help",
+        "Mix livery: each sketch gets its own colour scheme, changing daily",
+        "Save any sketch as a desktop or phone wallpaper image (\u2699 in the Library)"
+      ]
+    },
     {
       "version": "3.7.0",
       "date": "2026-10-17",

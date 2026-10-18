@@ -1,6 +1,6 @@
 // Library, settings and rotation for Backdrop Rotator (sketch-only edition).
 // Nothing here downloads images from the web: every background is a line drawing stored as a few numbers.
-const APP_VERSION = '3.7.0';
+const APP_VERSION = '3.8.0';
 
 const BR = (() => {
   // ---------- Storage (lives in the extension, reached through the bridge) ----------
@@ -46,6 +46,9 @@ const BR = (() => {
     showDate: true,
     showSeconds: false,
     search: true,
+    countdownName: '',     // e.g. ARMY-NAVY; shown as "34 DAYS TO ARMY-NAVY" under the clock
+    countdownDate: '',     // YYYY-MM-DD
+    zen: false,            // Focus view: only the sketch (press F on the new tab)
     // Rotation
     mode: 'newtab',        // 'newtab' | 'interval' | 'daily'
     intervalMin: 30,

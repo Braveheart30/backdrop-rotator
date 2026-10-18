@@ -34,7 +34,8 @@ else (() => {
     settings = await BR.getSettings();
     const s = settings;
     for (const k of ['sketchStyle', 'textPos', 'clockStyle', 'mode', 'intervalMin', 'order', 'claudeKey']) $('#' + k).value = String(s[k] ?? '');
-    for (const k of ['animate', 'clock24', 'showDate', 'showSeconds', 'search']) $('#' + k).checked = !!s[k];
+    for (const k of ['animate', 'clock24', 'showDate', 'showSeconds', 'search', 'zen']) $('#' + k).checked = !!s[k];
+    $('#countdownName').value = s.countdownName || ''; $('#countdownDate').value = s.countdownDate || '';
     $('#skText').value = s.sketchText || '';
     $('#ecoSw').checked = s.eco;
     $('#intervalRow').hidden = s.mode !== 'interval';
@@ -290,6 +291,27 @@ else (() => {
   $('#edLivery').addEventListener('change', renderEditor);
   $('#edSpeed').addEventListener('change', renderEditor);
   $('#edClose').addEventListener('click', () => { editing = null; $('#editor').hidden = true; $('#edCanvas').replaceChildren(); });
+  // Save the sketch (as it looks now, with its livery) as a wallpaper image.
+  async function saveImage(phone) {
+    const d = editDraft(); if (!d) return;
+    const w = phone ? 1290 : Math.max(1920, Math.round(screen.width * (devicePixelRatio || 1))), h = phone ? 2796 : Math.round(w * 9 / 16);
+    try {
+      const blob = await Sketch.toImage(d, look(), w, h);
+      const name = (editing.name || 'sketch').replace(/[^\w -]+/g, '').trim().replace(/\s+/g, '-') + (phone ? '-phone' : '-desktop') + '.png';
+      const info = await Bridge.call('info').catch(() => ({}));
+      const v = String(info.shellVersion || '0').split('.').map((x) => parseInt(x, 10) || 0);
+      if (v[0] > 2 || (v[0] === 2 && (v[1] > 6 || (v[1] === 6 && v[2] >= 5)))) {
+        const dataUrl = await new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); });
+        await Bridge.call('saveImage', { dataUrl, name });
+      } else {
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      }
+      toast(`Saved ${name} to your Downloads folder.`);
+    } catch (e) { toast("Couldn't save the image: " + (e.message || e)); }
+  }
+  $('#edImgDesk').addEventListener('click', () => saveImage(false));
+  $('#edImgPhone').addEventListener('click', () => saveImage(true));
   $('#edSave').addEventListener('click', async () => {
     if (!editing) return;
     const d = editDraft();
@@ -355,7 +377,9 @@ else (() => {
   $('#motion').addEventListener('change', async (e) => { await save({ motion: e.target.value }); renderLookPreview(); renderEditor(); });
   $('#motionSpeed').addEventListener('change', async (e) => { await save({ motionSpeed: e.target.value }); renderLookPreview(); renderEditor(); });
   $('#clockStyle').addEventListener('change', (e) => save({ clockStyle: e.target.value }));
-  for (const k of ['clock24', 'showDate', 'showSeconds', 'search']) $('#' + k).addEventListener('change', (e) => save({ [k]: e.target.checked }));
+  for (const k of ['clock24', 'showDate', 'showSeconds', 'search', 'zen']) $('#' + k).addEventListener('change', (e) => save({ [k]: e.target.checked }));
+  $('#countdownName').addEventListener('change', (e) => { e.target.value = Sketch.cleanText(e.target.value); save({ countdownName: e.target.value }); });
+  $('#countdownDate').addEventListener('change', (e) => save({ countdownDate: /^\d{4}-\d{2}-\d{2}$/.test(e.target.value) ? e.target.value : '' }));
   $('#mode').addEventListener('change', (e) => {
     $('#intervalRow').hidden = e.target.value !== 'interval';
     save({ mode: e.target.value, lastChange: Date.now() });

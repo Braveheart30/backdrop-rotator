@@ -281,3 +281,7 @@ a.btn { text-decoration: none; display: inline-block; }
 .ed-fields select, .ed-fields input { width: 100%; }
 @media (max-width: 640px) { .editor { grid-template-columns: 1fr; } }
 #grid figure .gear { position: absolute; top: 6px; left: 6px; }
+
+.cd-in { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.cd-in .text-in { width: auto; flex: 0 1 170px; text-transform: uppercase; }
+.cd-in input[type=date] { text-transform: none; color-scheme: dark; }

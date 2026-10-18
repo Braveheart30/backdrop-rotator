@@ -135,22 +135,25 @@ const Sketch = (() => {
   // Liveries (looks). "neon" glows in the chosen accent colour; the rest set their own colours.
   // bg is a CSS background (it may include a grid); light = dark lines on a light ground (clock turns dark too).
   const rg = (a, b, c) => `radial-gradient(ellipse at 50% 45%, ${a} 0%, ${b} 62%, ${c || b} 100%)`;
+  const G = (a, b, c) => ({ bg: rg(a, b, c), grad: [a, b, c || b] });
   const LOOKS = {
     neon: { name: 'Neon glow on black', glow: true, width: 2.4 },
     dark: { name: 'White on black', glow: false, width: 2, bg: '#000000', stroke: '#f5f5f7', text: '#f5f5f7', light: false },
     light: { name: 'Black on white', glow: false, width: 2, bg: '#f5f5f7', stroke: '#1d1d1f', text: '#1d1d1f', light: true },
-    paper: { name: 'Ink on paper', glow: false, width: 2.2, bg: rg('#fbf6ea', '#f1e8d4', '#e4d8bd'), stroke: '#22201c', text: '#2b2722', light: true },
-    vanilla: { name: 'Espresso on vanilla', glow: false, width: 2.2, bg: rg('#fbefcf', '#f2e0b0', '#e6cf96'), stroke: '#3a2618', text: '#4a3020', light: true },
-    sepia: { name: 'Sepia print', glow: false, width: 2.1, bg: rg('#eedcb6', '#dfc699', '#cdb07e'), stroke: '#4e3218', text: '#5a3a1c', light: true },
-    graphite: { name: 'Graphite on stone', glow: false, width: 1.9, bg: rg('#ecebe7', '#dddbd5', '#cfccc4'), stroke: '#2f3033', text: '#3a3b3e', light: true },
+    paper: { name: 'Ink on paper', glow: false, width: 2.2, ...G('#fbf6ea', '#f1e8d4', '#e4d8bd'), stroke: '#22201c', text: '#2b2722', light: true },
+    vanilla: { name: 'Espresso on vanilla', glow: false, width: 2.2, ...G('#fbefcf', '#f2e0b0', '#e6cf96'), stroke: '#3a2618', text: '#4a3020', light: true },
+    sepia: { name: 'Sepia print', glow: false, width: 2.1, ...G('#eedcb6', '#dfc699', '#cdb07e'), stroke: '#4e3218', text: '#5a3a1c', light: true },
+    graphite: { name: 'Graphite on stone', glow: false, width: 1.9, ...G('#ecebe7', '#dddbd5', '#cfccc4'), stroke: '#2f3033', text: '#3a3b3e', light: true },
     blueprint: { name: 'Blueprint', glow: false, width: 2, stroke: '#eef6ff', text: '#eef6ff', light: false,
+      grid: true, grad: ['#2862ab', '#184782', '#0f3262'],
       bg: 'linear-gradient(rgba(255,255,255,.07) 1px, transparent 1px) 0 0 / 44px 44px, linear-gradient(90deg, rgba(255,255,255,.07) 1px, transparent 1px) 0 0 / 44px 44px, ' + rg('#2862ab', '#184782', '#0f3262') },
-    chalk: { name: 'Chalk on slate', glow: false, width: 2.3, bg: rg('#38483f', '#26312b', '#1b231f'), stroke: '#efeee4', text: '#efeee4', light: false },
-    gold: { name: 'Army black and gold', glow: true, width: 2.2, bg: rg('#1d1a12', '#0b0a08', '#040404'), stroke: '#d9b54a', text: '#ecd27e', light: false },
-    od: { name: 'Olive drab', glow: false, width: 2.2, bg: rg('#4f5b37', '#323c22', '#252d19'), stroke: '#ebe1c1', text: '#ebe1c1', light: false },
-    nvg: { name: 'Night vision', glow: true, width: 2.2, bg: rg('#0d3416', '#04140a', '#010603'), stroke: '#8dff8a', text: '#c9ffc4', light: false },
-    warm: { name: 'Low light (warm, easy on the eyes at night)', glow: false, width: 2, bg: rg('#1d140c', '#0b0805', '#050302'), stroke: '#c8874a', text: '#d9a06a', light: false },
-    auto: { name: 'Auto: ink on paper by day, low light at night' }
+    chalk: { name: 'Chalk on slate', glow: false, width: 2.3, ...G('#38483f', '#26312b', '#1b231f'), stroke: '#efeee4', text: '#efeee4', light: false },
+    gold: { name: 'Army black and gold', glow: true, width: 2.2, ...G('#1d1a12', '#0b0a08', '#040404'), stroke: '#d9b54a', text: '#ecd27e', light: false },
+    od: { name: 'Olive drab', glow: false, width: 2.2, ...G('#4f5b37', '#323c22', '#252d19'), stroke: '#ebe1c1', text: '#ebe1c1', light: false },
+    nvg: { name: 'Night vision', glow: true, width: 2.2, ...G('#0d3416', '#04140a', '#010603'), stroke: '#8dff8a', text: '#c9ffc4', light: false },
+    warm: { name: 'Low light (warm, easy on the eyes at night)', glow: false, width: 2, ...G('#1d140c', '#0b0805', '#050302'), stroke: '#c8874a', text: '#d9a06a', light: false },
+    auto: { name: 'Auto: ink on paper by day, low light at night' },
+    mix: { name: 'Mix: each sketch gets its own livery, changing daily' }
   };
   const ACCENTS = {
     blue: { name: 'Electric blue', stroke: '#5cc8ff', text: '#bfe8ff', tint: '#0b1d3a' },
@@ -165,10 +168,16 @@ const Sketch = (() => {
   function theme(look = {}, sk) {
     let style = sk && LOOKS[sk.livery] ? sk.livery : look.style;
     if (style === 'auto') { const h = new Date().getHours(); style = h >= 7 && h < 19 ? 'paper' : 'warm'; }
+    if (style === 'mix') {   // a steady pick per sketch for the day, so a sketch keeps its colours all day
+      const pool = ['neon', 'paper', 'vanilla', 'blueprint', 'gold', 'od', 'nvg', 'chalk', 'sepia', 'graphite'];
+      const key = sk ? String(sk.subject || '') + String((sk.custom && sk.custom.name) || sk.name || '') : '';
+      let hsh = Math.floor(Date.now() / 864e5) * 7; for (const c of key) hsh = (hsh * 31 + c.charCodeAt(0)) >>> 0;
+      style = pool[hsh % pool.length];
+    }
     const l = LOOKS[style] || LOOKS.neon;
     if (style !== 'neon' && l.stroke) return l;
     const a = ACCENTS[look.accent] || ACCENTS.blue;
-    return { ...LOOKS.neon, stroke: a.stroke, text: a.text, light: false,
+    return { ...LOOKS.neon, stroke: a.stroke, text: a.text, light: false, grad: [a.tint, '#050b18', '#010206'],
       bg: `radial-gradient(ellipse at 50% 55%, ${a.tint} 0%, #050b18 55%, #010206 100%)` };
   }
 
@@ -283,6 +292,28 @@ const Sketch = (() => {
   }
 
   const background = (look, sk) => theme(look, sk).bg;
+
+  // A still image of a sketch with its background, for use as a desktop or phone wallpaper (PNG blob).
+  async function toImage(sk, look, w, h) {
+    const t = theme(look, sk), c = document.createElement('canvas'); c.width = w; c.height = h;
+    const g = c.getContext('2d');
+    const [a, b, d] = t.grad || [t.bg, t.bg, t.bg];
+    g.save(); g.translate(w / 2, h * 0.45); g.scale(1, h / w);
+    const R = w * 0.78, rad = g.createRadialGradient(0, 0, 0, 0, 0, R);
+    rad.addColorStop(0, a); rad.addColorStop(0.62, b); rad.addColorStop(1, d);
+    g.fillStyle = rad; g.fillRect(-w, -w * 2, w * 2, w * 4); g.restore();
+    if (t.grid) { g.strokeStyle = 'rgba(255,255,255,.07)'; g.lineWidth = Math.max(1, w / 1920); const step = 44 * w / 1920 * (h > w ? 1.6 : 1);
+      for (let x = 0; x < w; x += step) { g.beginPath(); g.moveTo(x + .5, 0); g.lineTo(x + .5, h); g.stroke(); }
+      for (let y = 0; y < h; y += step) { g.beginPath(); g.moveTo(0, y + .5); g.lineTo(w, y + .5); g.stroke(); } }
+    let svg = render(sk, { ...look, animate: false, motion: 'off' }, {}).replace('width="100%" height="100%"', `width="${w}" height="${h}"`);
+    if (h > w) svg = svg.replace('viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice"', 'viewBox="400 0 1120 1080" preserveAspectRatio="xMidYMid meet"');
+    const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+    try {
+      const img = new Image(); await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
+      g.drawImage(img, 0, 0, w, h);
+    } finally { URL.revokeObjectURL(url); }
+    return new Promise((res) => c.toBlob(res, 'image/png'));
+  }
   const isLight = (look, sk) => !!theme(look, sk).light;
 
   // ---------- "Surprise me": new drawings made on this computer, in the same style ----------
@@ -363,5 +394,5 @@ const Sketch = (() => {
     return { id: 'g' + seed.toString(36), name: g.name, kind: k, ...out };
   }
 
-  return { MOTIONS, SPEEDS, SUBJECTS, LOOKS, ACCENTS, GENERATORS, render, background, isLight, generate, cleanText };
+  return { MOTIONS, SPEEDS, SUBJECTS, LOOKS, ACCENTS, GENERATORS, render, background, isLight, generate, cleanText, toImage };
 })();
