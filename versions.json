@@ -1,6 +1,13 @@
 {
-  "latest": "3.8.0",
+  "latest": "3.9.0",
   "versions": [
+    {
+      "version": "3.9.0",
+      "date": "2026-10-17",
+      "notes": [
+        "Every built-in sketch except the Cybertruck, monorail and castle is now traced from a real public-domain photo, like the Chinook: F-22 Raptor, Boeing 737 airliner, MQ-9 Reaper, Lower Manhattan skyline, Mount Fuji, USS Constitution and a touring motorcycle (replacing the Light-cycle)."
+      ]
+    },
     {
       "version": "3.8.0",
       "date": "2026-10-17",
