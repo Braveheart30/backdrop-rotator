@@ -1,6 +1,13 @@
 {
-  "latest": "3.9.1",
+  "latest": "3.9.2",
   "versions": [
+    {
+      "version": "3.9.2",
+      "date": "2026-10-18",
+      "notes": [
+        "Built-in sketches keep the simple 2D style but are now shaped after the real thing: a 737-proportioned airliner, an F-22 planform, real Cybertruck dimensions, a Phantom-style quadcopter, a beam monorail, Manhattan landmarks, a Neuschwanstein-style castle, the Teton Range and a modern cruise liner."
+      ]
+    },
     {
       "version": "3.9.1",
       "date": "2026-10-17",
