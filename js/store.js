@@ -1,6 +1,6 @@
 // Library, settings and rotation for Backdrop Rotator (sketch-only edition).
 // Nothing here downloads images from the web: every background is a line drawing stored as a few numbers.
-const APP_VERSION = '3.9.0';
+const APP_VERSION = '3.9.1';
 
 const BR = (() => {
   // ---------- Storage (lives in the extension, reached through the bridge) ----------

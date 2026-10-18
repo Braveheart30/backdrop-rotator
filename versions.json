@@ -1,6 +1,13 @@
 {
-  "latest": "3.9.0",
+  "latest": "3.9.1",
   "versions": [
+    {
+      "version": "3.9.1",
+      "date": "2026-10-17",
+      "notes": [
+        "Built-in sketches are back to the original simple 2D style, each with a few extra details (windows, doors, wheel hubs, battlements, snowcaps, portholes and more)."
+      ]
+    },
     {
       "version": "3.9.0",
       "date": "2026-10-17",
