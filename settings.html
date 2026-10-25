@@ -160,6 +160,15 @@
     </div>
   </section>
 
+  <section class="card" id="quick">
+    <h2>Quick launch</h2>
+    <p class="sub">Your most used sites, behind the hexagon emblem in the bottom-left corner of the new tab. Click it or press <b>G</b>, then click a site or press its number (1&ndash;9). Ctrl+click opens a site in a new tab.</p>
+    <div class="row" style="border-top:0"><label for="launch">Show the quick-launch emblem</label><input id="launch" type="checkbox" class="switch"></div>
+    <div id="qlList"></div>
+    <form id="qlForm" class="ql-actions"><input id="qlNewName" class="text-in" maxlength="20" placeholder="Name (e.g. Canvas)" aria-label="New site name"><input id="qlNewUrl" class="text-in" placeholder="Address (e.g. canvas.instructure.com)" aria-label="New site address"><button id="qlAdd" class="btn" type="submit">Add</button></form>
+    <p id="qlNote" class="opt"></p>
+  </section>
+
   <section class="card" id="library">
     <div class="lib-head">
       <h2>Library <span id="count"></span></h2>
@@ -213,6 +222,7 @@
   <script src="js/bridge.js"></script>
   <script src="js/store.js"></script>
   <script src="js/sketch.js"></script>
+  <script src="js/launch.js"></script>
   <script src="js/claude.js"></script>
   <script src="js/settings.js"></script>
 </body>

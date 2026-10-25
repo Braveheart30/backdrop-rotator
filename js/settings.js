@@ -36,6 +36,7 @@ else (() => {
     for (const k of ['sketchStyle', 'textPos', 'clockStyle', 'mode', 'intervalMin', 'order', 'claudeKey']) $('#' + k).value = String(s[k] ?? '');
     for (const k of ['animate', 'clock24', 'showDate', 'showSeconds', 'search', 'zen']) $('#' + k).checked = !!s[k];
     $('#countdownName').value = s.countdownName || ''; $('#countdownDate').value = s.countdownDate || '';
+    $('#launch').checked = s.launch !== false; renderQuick();
     $('#skText').value = s.sketchText || '';
     $('#ecoSw').checked = s.eco;
     $('#intervalRow').hidden = s.mode !== 'interval';
@@ -378,6 +379,45 @@ else (() => {
   $('#motionSpeed').addEventListener('change', async (e) => { await save({ motionSpeed: e.target.value }); renderLookPreview(); renderEditor(); });
   $('#clockStyle').addEventListener('change', (e) => save({ clockStyle: e.target.value }));
   for (const k of ['clock24', 'showDate', 'showSeconds', 'search', 'zen']) $('#' + k).addEventListener('change', (e) => save({ [k]: e.target.checked }));
+  // ---------- Quick launch editor ----------
+  let qlDraft = null;
+  function renderQuick() {
+    qlDraft = Launch.clean(settings.quickLinks);
+    const box = $('#qlList'); box.replaceChildren();
+    qlDraft.forEach((l, i) => {
+      const row = document.createElement('div'); row.className = 'ql-row';
+      const ic = document.createElement('span'); ic.className = 'ql-icon'; ic.innerHTML = Launch.svg(Launch.iconFor(l), 22);
+      const sel = document.createElement('select'); sel.setAttribute('aria-label', 'Symbol for ' + l.name);
+      const auto = document.createElement('option'); auto.value = 'auto'; auto.textContent = 'Symbol: automatic'; sel.append(auto);
+      for (const [k, [label]] of Object.entries(Launch.GLYPHS)) { const o = document.createElement('option'); o.value = k; o.textContent = label; sel.append(o); }
+      sel.value = l.icon;
+      const nm = document.createElement('input'); nm.className = 'text-in ql-name'; nm.maxLength = 20; nm.value = l.name; nm.placeholder = 'Name'; nm.setAttribute('aria-label', 'Site name');
+      const url = document.createElement('input'); url.className = 'text-in ql-url'; url.type = 'url'; url.value = l.url; url.placeholder = 'https://…'; url.setAttribute('aria-label', 'Site address');
+      const up = document.createElement('button'); up.type = 'button'; up.className = 'btn ghost sm'; up.textContent = '↑'; up.title = 'Move up'; up.disabled = i === 0;
+      const del = document.createElement('button'); del.type = 'button'; del.className = 'btn ghost sm'; del.textContent = '✕'; del.title = 'Remove';
+      const num = document.createElement('b'); num.className = 'ql-num'; num.textContent = i + 1;
+      const commit = () => {
+        const u = Launch.normUrl(url.value);
+        if (!u) { $('#qlNote').textContent = 'That address doesn\'t look right (use something like https://example.com).'; url.focus(); return; }
+        qlDraft[i] = { name: nm.value.trim() || Launch.hostOf(u), url: u, icon: sel.value }; saveQuick();
+      };
+      sel.addEventListener('change', commit); nm.addEventListener('change', commit); url.addEventListener('change', commit);
+      up.addEventListener('click', () => { [qlDraft[i - 1], qlDraft[i]] = [qlDraft[i], qlDraft[i - 1]]; saveQuick(); });
+      del.addEventListener('click', () => { qlDraft.splice(i, 1); saveQuick(); });
+      row.append(num, ic, sel, nm, url, up, del); box.append(row);
+    });
+    $('#qlAdd').disabled = qlDraft.length >= Launch.MAX;
+    $('#qlNote').textContent = qlDraft.length >= Launch.MAX ? `That's the most (${Launch.MAX}).` : qlDraft.length ? '' : 'No sites yet.';
+  }
+  async function saveQuick() { await save({ quickLinks: Launch.clean(qlDraft) }); renderQuick(); }
+  $('#launch').addEventListener('change', (e) => save({ launch: e.target.checked }));
+  $('#qlForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const url = Launch.normUrl($('#qlNewUrl').value);
+    if (!url) { $('#qlNote').textContent = 'That address doesn\'t look right (use something like canvas.instructure.com).'; $('#qlNewUrl').focus(); return; }
+    qlDraft.push({ name: $('#qlNewName').value.trim() || Launch.hostOf(url).split('.')[0].replace(/^./, (c) => c.toUpperCase()), url, icon: 'auto' });
+    $('#qlNewName').value = ''; $('#qlNewUrl').value = ''; saveQuick();
+  });
   $('#countdownName').addEventListener('change', (e) => { e.target.value = Sketch.cleanText(e.target.value); save({ countdownName: e.target.value }); });
   $('#countdownDate').addEventListener('change', (e) => save({ countdownDate: /^\d{4}-\d{2}-\d{2}$/.test(e.target.value) ? e.target.value : '' }));
   $('#mode').addEventListener('change', (e) => {

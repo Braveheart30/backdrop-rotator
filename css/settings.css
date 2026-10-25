@@ -285,3 +285,15 @@ a.btn { text-decoration: none; display: inline-block; }
 .cd-in { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .cd-in .text-in { width: auto; flex: 0 1 170px; text-transform: uppercase; }
 .cd-in input[type=date] { text-transform: none; color-scheme: dark; }
+
+/* Quick launch editor */
+#quick .sub { margin: 0 0 6px; color: var(--muted); font-size: 14px; }
+.ql-row { display: grid; grid-template-columns: 18px 26px 150px 1fr 1.6fr auto auto; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+.ql-num { color: var(--muted); font-size: 13px; text-align: center; }
+.ql-icon { display: grid; place-items: center; color: var(--accent); }
+.ql-row .text-in { width: 100%; min-width: 0; }
+.ql-actions { display: flex; align-items: center; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.ql-actions .text-in { flex: 1 1 160px; width: auto; }
+#qlNote { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+#qlNote:empty { display: none; }
+@media (max-width: 640px) { .ql-row { grid-template-columns: 18px 26px 1fr auto auto; } .ql-row select { grid-column: 3 / -1; } .ql-name, .ql-url { grid-column: 2 / -1; } }

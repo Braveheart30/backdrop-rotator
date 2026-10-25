@@ -1,6 +1,6 @@
 // Library, settings and rotation for Backdrop Rotator (sketch-only edition).
 // Nothing here downloads images from the web: every background is a line drawing stored as a few numbers.
-const APP_VERSION = '3.10.0';
+const APP_VERSION = '3.11.0';
 
 const BR = (() => {
   // ---------- Storage (lives in the extension, reached through the bridge) ----------
@@ -49,6 +49,13 @@ const BR = (() => {
     countdownName: '',     // e.g. ARMY-NAVY; shown as "34 DAYS TO ARMY-NAVY" under the clock
     countdownDate: '',     // YYYY-MM-DD
     zen: false,            // Focus view: only the sketch (press F on the new tab)
+    launch: true,          // quick-launch emblem (bottom-left; G on the new tab)
+    quickLinks: [
+      { name: 'Notion', url: 'https://www.notion.so', icon: 'auto' },
+      { name: 'Calendar', url: 'https://calendar.notion.so', icon: 'auto' },
+      { name: 'Todoist', url: 'https://app.todoist.com', icon: 'auto' },
+      { name: 'Claude', url: 'https://claude.ai', icon: 'auto' }
+    ],
     // Rotation
     mode: 'newtab',        // 'newtab' | 'interval' | 'daily'
     intervalMin: 30,

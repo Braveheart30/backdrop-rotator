@@ -41,6 +41,7 @@ else (() => {
     dateEl.classList.toggle('off', !s.showDate);
     document.documentElement.style.background = Sketch.background(BR.look(s), shownSketch);
     b.classList.toggle('zen', !!s.zen);
+    renderLaunch(s);
     tickClock();
   }
 
@@ -83,6 +84,45 @@ else (() => {
     announce();
     schedule();
   }
+
+
+  // ---------- Quick launch: a hexagon emblem that fans your sites out in an arc ----------
+  const launchEl = document.getElementById('launch'), ringEl = document.getElementById('launchRing'), launchBtn = document.getElementById('launchBtn');
+  let launchKey = '', links = [];
+  function renderLaunch(s) {
+    links = s.launch === false ? [] : Launch.clean(s.quickLinks);
+    launchEl.classList.toggle('off', s.launch === false);
+    const key = JSON.stringify(links);
+    if (key === launchKey) return;
+    launchKey = key; ringEl.replaceChildren();
+    const n = links.length, R = Math.max(118, Math.round((n * 60) / (Math.PI / 2)));
+    links.forEach((l, i) => {
+      const a = document.createElement('a');
+      a.className = 'node'; a.href = l.url; a.target = '_top'; a.rel = 'noreferrer'; a.setAttribute('role', 'menuitem');
+      a.title = `${l.name} (${i + 1})`;
+      const t = n === 1 ? 0.5 : i / (n - 1), ang = (-90 + 90 * t) * Math.PI / 180;   // from straight up round to the right
+      a.style.setProperty('--x', Math.round(Math.cos(ang) * R) + 'px');
+      a.style.setProperty('--y', Math.round(Math.sin(ang) * R) + 'px');
+      a.style.setProperty('--d', (i * 40) + 'ms');
+      a.innerHTML = `<span class="tile"><svg class="frame" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 2 L43 13 V35 L24 46 L5 35 V13 Z"/></svg>${Launch.svg(Launch.iconFor(l), 20)}<b>${i + 1}</b></span><span class="lbl"></span>`;
+      a.querySelector('.lbl').textContent = l.name;
+      a.addEventListener('click', () => setLaunch(false));
+      ringEl.append(a);
+    });
+    if (!n) {
+      const e = document.createElement('button'); e.className = 'node empty-node'; e.type = 'button';
+      e.style.setProperty('--x', '0px'); e.style.setProperty('--y', '-118px'); e.style.setProperty('--d', '0ms');
+      e.innerHTML = `<span class="tile"><svg class="frame" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 2 L43 13 V35 L24 46 L5 35 V13 Z"/></svg>${Launch.svg('star', 20)}</span><span class="lbl">Add sites in Settings</span>`;
+      e.addEventListener('click', () => Bridge.call('openSettings'));
+      ringEl.append(e);
+    }
+  }
+  function setLaunch(open) {
+    launchEl.classList.toggle('open', open);
+    launchBtn.setAttribute('aria-expanded', String(open));
+  }
+  launchBtn.addEventListener('click', (e) => { e.stopPropagation(); setLaunch(!launchEl.classList.contains('open')); });
+  document.addEventListener('click', (e) => { if (!launchEl.contains(e.target)) setLaunch(false); });
 
   // Settings changes show up right away on open tabs.
   Bridge.onStorage(async (c) => {
@@ -132,6 +172,11 @@ else (() => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) { if (e.key === 'Escape') e.target.blur(); return; }
     const k = e.key;
+    if (launchEl.classList.contains('open') && /^[1-9]$/.test(k)) {
+      const l = links[+k - 1]; if (l) { e.preventDefault(); setLaunch(false); window.top.location.href = l.url; } return;
+    }
+    if (k === 'g' || k === 'G') { if (settings.launch !== false) setLaunch(!launchEl.classList.contains('open')); return; }
+    if (k === 'Escape') setLaunch(false);
     if (k === 'n' || k === 'N' || k === 'ArrowRight') { e.preventDefault(); refresh(true); }
     else if (k === 'p' || k === 'P' || k === 'ArrowLeft') { e.preventDefault(); showPrevious(); }
     else if (k === 'l') stepLivery(1);
