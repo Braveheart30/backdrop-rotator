@@ -323,6 +323,7 @@ const Sketch = (() => {
     od: { name: 'Olive drab', glow: false, width: 2.2, ...G('#4f5b37', '#323c22', '#252d19'), stroke: '#ebe1c1', text: '#ebe1c1', light: false },
     nvg: { name: 'Night vision', glow: true, width: 2.2, ...G('#0d3416', '#04140a', '#010603'), stroke: '#8dff8a', text: '#c9ffc4', light: false },
     warm: { name: 'Low light (warm, easy on the eyes at night)', glow: false, width: 2, ...G('#1d140c', '#0b0805', '#050302'), stroke: '#c8874a', text: '#d9a06a', light: false },
+    fpln: { name: 'FPLN glass cockpit (cyan on deep navy)', glow: true, width: 2.2, ...G('#0b2230', '#04070c', '#020407'), stroke: '#3ef0ff', text: '#d8f7ff', light: false },
     auto: { name: 'Auto: ink on paper by day, low light at night' },
     mix: { name: 'Mix: each sketch gets its own livery, changing daily' }
   };
@@ -340,7 +341,7 @@ const Sketch = (() => {
     let style = sk && LOOKS[sk.livery] ? sk.livery : look.style;
     if (style === 'auto') { const h = new Date().getHours(); style = h >= 7 && h < 19 ? 'paper' : 'warm'; }
     if (style === 'mix') {   // a steady pick per sketch for the day, so a sketch keeps its colours all day
-      const pool = ['neon', 'paper', 'vanilla', 'blueprint', 'gold', 'od', 'nvg', 'chalk', 'sepia', 'graphite'];
+      const pool = ['neon', 'paper', 'vanilla', 'blueprint', 'gold', 'od', 'nvg', 'chalk', 'sepia', 'graphite', 'fpln'];
       const key = sk ? String(sk.subject || '') + String((sk.custom && sk.custom.name) || sk.name || '') : '';
       let hsh = Math.floor(Date.now() / 864e5) * 7; for (const c of key) hsh = (hsh * 31 + c.charCodeAt(0)) >>> 0;
       style = pool[hsh % pool.length];
@@ -565,5 +566,5 @@ const Sketch = (() => {
     return { id: 'g' + seed.toString(36), name: g.name, kind: k, ...out };
   }
 
-  return { MOTIONS, SPEEDS, SUBJECTS, LOOKS, ACCENTS, GENERATORS, render, background, isLight, generate, cleanText, toImage };
+  return { MOTIONS, SPEEDS, SUBJECTS, LOOKS, ACCENTS, GENERATORS, render, background, isLight, theme, generate, cleanText, toImage };
 })();

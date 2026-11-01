@@ -35,6 +35,7 @@ else (() => {
     const s = settings;
     for (const k of ['sketchStyle', 'textPos', 'clockStyle', 'mode', 'intervalMin', 'order', 'claudeKey']) $('#' + k).value = String(s[k] ?? '');
     for (const k of ['animate', 'clock24', 'showDate', 'showSeconds', 'search', 'zen']) $('#' + k).checked = !!s[k];
+    $('#hud').checked = s.hud !== false;
     $('#countdownName').value = s.countdownName || ''; $('#countdownDate').value = s.countdownDate || '';
     $('#launch').checked = s.launch !== false; renderQuick();
     $('#skText').value = s.sketchText || '';
@@ -378,6 +379,7 @@ else (() => {
   $('#motion').addEventListener('change', async (e) => { await save({ motion: e.target.value }); renderLookPreview(); renderEditor(); });
   $('#motionSpeed').addEventListener('change', async (e) => { await save({ motionSpeed: e.target.value }); renderLookPreview(); renderEditor(); });
   $('#clockStyle').addEventListener('change', (e) => save({ clockStyle: e.target.value }));
+  $('#hud').addEventListener('change', (e) => save({ hud: e.target.checked }));
   for (const k of ['clock24', 'showDate', 'showSeconds', 'search', 'zen']) $('#' + k).addEventListener('change', (e) => save({ [k]: e.target.checked }));
   // ---------- Quick launch editor ----------
   let qlDraft = null;
