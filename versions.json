@@ -1,6 +1,13 @@
 {
-  "latest": "3.12.0",
+  "latest": "3.12.1",
   "versions": [
+    {
+      "version": "3.12.1",
+      "date": "2026-10-31",
+      "notes": [
+        "Fix: the HUD and APPS dial no longer flash and then vanish. In Focus view (F) the APPS dial and HUD frame stay on screen, dimmed, and the status line says how to turn Focus view off."
+      ]
+    },
     {
       "version": "3.12.0",
       "date": "2026-10-31",

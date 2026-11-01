@@ -43,6 +43,7 @@ else (() => {
     document.documentElement.style.background = Sketch.background(BR.look(s), shownSketch);
     b.classList.toggle('zen', !!s.zen);
     b.classList.toggle('hud', s.hud !== false);
+    b.classList.remove('booting');
     hudColors(s); renderLaunch(s); hudStatus();
     tickClock();
   }
@@ -107,7 +108,7 @@ else (() => {
   function hudStatus() {
     const sk = shownSketch, name = sk ? ((sk.custom && sk.custom.name) || (Sketch.SUBJECTS[sk.subject] || {}).name || 'Sketch') : 'No sketch';
     const lv = (Sketch.LOOKS[(sk && sk.livery) || settings.sketchStyle] || {}).name || '';
-    hudBottom.textContent = `${name}  ·  ${lv.split(/[(:]/)[0].trim()}  ·  ${links.length} app${links.length === 1 ? '' : 's'}  ·  ? help`.toUpperCase();
+    hudBottom.textContent = (settings.zen ? `Focus view on  ·  press F to show the clock and search` : `${name}  ·  ${lv.split(/[(:]/)[0].trim()}  ·  ${links.length} app${links.length === 1 ? '' : 's'}  ·  ? help`).toUpperCase();
   }
 
   // ---------- Quick launch: the APPS dial fans your sites out in two arcs ----------
@@ -269,7 +270,7 @@ else (() => {
     else if (k === 'p' || k === 'P' || k === 'ArrowLeft') { e.preventDefault(); showPrevious(); }
     else if (k === 'l') stepLivery(1);
     else if (k === 'L') stepLivery(-1);
-    else if (k === 'f' || k === 'F') { const z = !settings.zen; settings.zen = z; document.body.classList.toggle('zen', z); toast(z ? 'Focus view on (F to turn off)' : 'Focus view off'); BR.saveSettings({ zen: z }); }
+    else if (k === 'f' || k === 'F') { const z = !settings.zen; settings.zen = z; document.body.classList.toggle('zen', z); toast(z ? 'Focus view on (F to turn off)' : 'Focus view off'); hudStatus(); BR.saveSettings({ zen: z }); }
     else if (k === '/') { e.preventDefault(); if (settings.search) document.getElementById('q').focus(); }
     else if (k === '?') helpEl.hidden = !helpEl.hidden;
     else if (k === 'Escape') helpEl.hidden = true;
@@ -279,5 +280,5 @@ else (() => {
   BR.migrate().catch(() => 0)
     .then(() => ClaudeSketch.drainInbox().catch(() => 0))
     .then(() => refresh())
-    .catch((e) => { console.error(e); announce(); });
+    .catch((e) => { console.error(e); document.body.classList.remove('booting'); announce(); });
 })();

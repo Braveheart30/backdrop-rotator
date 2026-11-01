@@ -73,9 +73,11 @@ body.clock-corner #clock { flex-wrap: wrap; }
 body.clock-corner #countdown { flex-basis: 100%; margin-top: 2px; }
 body.clock-top #countdown, body.clock-center #countdown { font-size: 13px; }
 
-/* Focus view: just the sketch */
-body.zen #bar, body.zen #controls, body.zen #launch { opacity: 0; pointer-events: none; transition: opacity .4s; }
-body.zen #controls:hover, body.zen #launch:hover, body.zen #launch.open { opacity: 1; pointer-events: auto; }
+/* Focus view: just the sketch. The HUD frame and the APPS dial stay, dimmed, so nothing seems to vanish. */
+body.zen #bar, body.zen #controls { opacity: 0; pointer-events: none; transition: opacity .4s; }
+body.zen #controls:hover { opacity: 1; pointer-events: auto; }
+/* Until your settings are read, show nothing that might change a moment later (no flash). */
+body.booting #bar, body.booting #controls, body.booting #launch, body.booting #hud { visibility: hidden; }
 
 #toast {
   position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 12px); z-index: 4; opacity: 0; pointer-events: none;
@@ -190,8 +192,9 @@ body.light #launchRing .lbl, body:not(.hud) #launchRing .lbl { color: inherit; t
 #launchRing .node.add .frame { stroke-dasharray: 4 3; }
 #launch.open::before { content: ""; position: absolute; left: 44px; top: 44px; width: 340px; height: 340px; border: 1px dashed currentColor; border-radius: 50%;
   transform: translate(-50%, -50%); opacity: .18; pointer-events: none; }
-body.zen #launch { opacity: 0; pointer-events: none; transition: opacity .4s; }
-body.zen #launch:hover, body.zen #launch.open { opacity: 1; pointer-events: auto; }
+body.zen #launch { opacity: .45; transition: opacity .3s; }
+body.zen #launch:hover, body.zen #launch.open, body.zen #launch:focus-within { opacity: 1; }
+body.zen #hud .hudline { opacity: .45; }
 
 /* ================= Add / edit apps panel ================= */
 .hudpanel { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 6; width: min(640px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto;
